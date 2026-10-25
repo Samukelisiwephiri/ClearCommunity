@@ -1,0 +1,2299 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClearCommunity - Pretoria Water Quality & Early-Warning Platform</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN for telemetry charting -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        navy: {
+                            900: '#071527',
+                            800: '#0A2540',
+                            700: '#11355A',
+                            600: '#1A4876'
+                        },
+                        teal: {
+                            400: '#2DD4BF',
+                            500: '#00D4B2',
+                            600: '#00A88F'
+                        },
+                        alertRed: '#E63946',
+                        warningAmber: '#FFB703',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbars for RS485 console */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #071527;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1A4876;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00D4B2;
+        }
+        .pulse-red {
+            animation: pulse-red 1.8s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(230, 57, 70, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0); }
+        }
+    </style>
+</head>
+<body class="h-full font-sans bg-navy-900 text-slate-100 antialiased flex flex-col min-h-screen selection:bg-teal-500 selection:text-navy-900">
+
+    <!-- ROLE ENTRY -->
+    <section id="login-view" class="flex-1 flex items-center justify-center p-4 sm:p-8">
+        <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-navy-800 p-6 sm:p-8 shadow-2xl space-y-6">
+            <div class="text-center">
+                <div class="mx-auto mb-4 h-52 w-full max-w-xs overflow-hidden rounded-xl bg-white">
+                    <img src="clearcommunity-logo.png" alt="ClearCommunity — Decentralized Water Vigilance & Alerts | Pretoria" class="h-full w-full object-cover object-center">
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight text-white">Welcome to ClearCommunity</h1>
+                <p class="mt-2 text-sm text-slate-400">Choose your portal to continue.</p>
+            </div>
+
+            <div class="flex border-b border-slate-700" role="tablist" aria-label="Choose portal">
+                <button type="button" onclick="switchLoginTab('community')" id="login-tab-community" role="tab" aria-selected="true" aria-controls="login-community" class="flex-1 border-b-2 border-teal-500 pb-3 text-sm font-semibold text-teal-300 transition">
+                    Community Access
+                </button>
+                <button type="button" onclick="switchLoginTab('municipal')" id="login-tab-municipal" role="tab" aria-selected="false" aria-controls="login-municipal" class="flex-1 border-b-2 border-transparent pb-3 text-sm font-semibold text-slate-400 transition hover:text-white">
+                    Municipal Login
+                </button>
+            </div>
+
+            <form id="login-community" role="tabpanel" aria-labelledby="login-tab-community" class="space-y-4" onsubmit="loginAsCommunity(event)">
+                <p class="text-sm text-slate-300">Sign in to view public water-quality alerts, submit community reports, and find emergency guidance.</p>
+                <div>
+                    <label for="loginCommunityLanguage" class="mb-1 block text-xs font-semibold text-slate-300">Language</label>
+                    <select data-role="community" id="loginCommunityLanguage" onchange="setCommunityLanguage(this.value)" aria-label="Choose community language" class="w-full rounded-xl border border-slate-700 bg-navy-900 px-3 py-2 text-sm text-white">
+                        <option value="en">English</option><option value="af">Afrikaans</option><option value="zu">isiZulu</option><option value="st">Sesotho</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="community-email-input" class="mb-1 block text-xs font-semibold text-slate-300">Email address</label>
+                    <input type="email" id="community-email-input" autocomplete="username" required placeholder="you@example.com" class="w-full rounded-xl border border-slate-700 bg-navy-900 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-teal-500 focus:outline-none">
+                </div>
+                <div>
+                    <label for="community-password-input" class="mb-1 block text-xs font-semibold text-slate-300">Password</label>
+                    <input type="password" id="community-password-input" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters" class="w-full rounded-xl border border-slate-700 bg-navy-900 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-teal-500 focus:outline-none">
+                    <p id="community-login-error" role="alert" class="mt-2 hidden text-xs text-red-400"></p>
+                </div>
+                <p class="text-xs text-amber-300">Prototype sign-in only: credentials are not verified or stored. Production login requires secure server-side authentication.</p>
+                <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-500 py-3 font-bold text-navy-900 transition hover:bg-teal-400">
+                    Sign in to Community Portal <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <form id="login-municipal" role="tabpanel" aria-labelledby="login-tab-municipal" class="hidden space-y-4" onsubmit="loginAsMunicipality(event)">
+                <p class="text-sm text-slate-300">Municipal console demo access for authorized officials.</p>
+                <div>
+                    <label for="municipal-id-input" class="mb-1 block text-xs font-semibold text-slate-300">Municipal Employee / Badge Number</label>
+                    <input type="text" id="municipal-id-input" autocomplete="username" placeholder="MUN-PTA-8842" pattern="MUN-[A-Za-z]{3}-[0-9]{4}" title="Use the format MUN-PTA-8842" class="w-full rounded-xl border border-slate-700 bg-navy-900 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-teal-500 focus:outline-none">
+                    <p id="login-error" role="alert" class="mt-2 hidden text-xs text-red-400">Enter a municipal number in the format MUN-PTA-8842.</p>
+                </div>
+                <p class="text-xs text-amber-300">Demo only: this checks the ID format and does not authenticate identity. Production access requires server-side authentication and authorization.</p>
+                <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 font-semibold text-white transition hover:bg-emerald-500">
+                    Continue to Municipal Console <i class="fa-solid fa-shield-halved"></i>
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <div id="app-shell" class="hidden flex-1 flex-col">
+    <!-- TOP GLOBAL NOTICE & SIMULATOR BAR -->
+    <div data-role="municipal" class="bg-navy-800 border-b border-slate-700/60 px-4 py-2 text-xs md:text-sm">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center space-x-2">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-teal-500/20 text-teal-400 border border-teal-500/30">
+                    <i class="fa-solid fa-microchip mr-1.5"></i> ClearHub #01 Active
+                </span>
+                <span class="text-slate-400 hidden sm:inline">| Pretoria Grid Node Gateway</span>
+            </div>
+
+            <!-- SIMULATION CONTROL BUTTON -->
+            <div class="flex items-center space-x-3">
+                <span class="text-slate-300 font-medium text-xs">Simulate Incident:</span>
+                <button id="toggleIncidentBtn" onclick="toggleSimulatedIncident()" class="px-3 py-1 bg-alertRed/20 hover:bg-alertRed/30 text-alertRed border border-alertRed/40 rounded-full font-semibold transition-all duration-200 flex items-center gap-1.5 text-xs shadow-sm">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="incidentBtnText">Trigger Contamination Incident</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN HEADER / NAVIGATION -->
+    <header class="bg-navy-800/90 backdrop-blur border-b border-slate-700/80 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                
+                <!-- BRANDING -->
+                <div class="flex items-center space-x-3">
+                    <div class="h-10 w-10 overflow-hidden rounded-xl bg-white shadow-lg shadow-teal-500/10">
+                        <img src="clearcommunity-logo.png" alt="" class="h-full w-full object-cover object-center">
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-xl font-bold tracking-tight text-white">ClearCommunity</h1>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">Tshwane v1.0</span>
+                        </div>
+                        <p class="text-xs text-slate-400">Transparent data for clean water & resilient neighborhoods</p>
+                    </div>
+                </div>
+
+                <!-- SYSTEM STATUS BADGE & RTC CLOCK -->
+                <div class="flex items-center space-x-4">
+                    <!-- Dynamic System Status Badge -->
+                    <div id="mainStatusBadge" class="flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 font-semibold text-sm">
+                        <span class="relative flex h-2.5 w-2.5">
+                          <span id="statusPing" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                          <span id="statusDot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500"></span>
+                        </span>
+                        <span id="statusText">SYSTEM SAFE</span>
+                    </div>
+
+                    <!-- RTC Clock -->
+                    <div data-role="municipal" class="hidden md:flex flex-col text-right font-mono text-xs text-slate-400 border-l border-slate-700 pl-4">
+                        <div class="flex items-center gap-1.5 text-slate-200 font-medium">
+                            <i class="fa-regular fa-clock text-teal-400"></i>
+                            <span id="rtcTimeDisplay">22:00:00 SAST</span>
+                        </div>
+                        <span id="rtcDateDisplay" class="text-slate-400">24 Oct 2026</span>
+                    </div>
+                    <div class="flex items-center gap-2 border-l border-slate-700 pl-4">
+                        <label data-role="community" for="communityLanguage" class="sr-only">Community language</label>
+                        <select data-role="community" id="communityLanguage" onchange="setCommunityLanguage(this.value)" aria-label="Choose community language" class="rounded-lg border border-slate-700 bg-navy-900 px-2 py-1.5 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                            <option value="en">English</option>
+                            <option value="af">Afrikaans</option>
+                            <option value="zu">isiZulu</option>
+                            <option value="st">Sesotho</option>
+                        </select>
+                        <span id="portalRoleBadge" class="hidden rounded-lg border border-teal-500/30 bg-teal-500/10 px-2.5 py-1.5 text-xs font-semibold text-teal-300 sm:inline-flex">Community Portal</span>
+                        <button type="button" onclick="logout()" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-alertRed/20 hover:text-white">
+                            <i class="fa-solid fa-right-from-bracket mr-1"></i> Exit
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NAVIGATION TABS -->
+            <nav class="flex items-center space-x-1 mt-4 overflow-x-auto pb-1 text-sm font-medium border-t border-slate-700/60 pt-2">
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab px-3.5 py-1.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center gap-2 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-chart-line"></i> Live Dashboard
+                </button>
+                <button onclick="switchTab('suburbs')" id="tab-suburbs" class="nav-tab px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-navy-700/60 flex items-center gap-2 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-map-location-dot"></i> Tshwane Suburbs Grid
+                </button>
+                <button data-role="municipal" onclick="switchTab('telemetry')" id="tab-telemetry" class="nav-tab px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-navy-700/60 flex items-center gap-2 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-microchip"></i> Municipal Hardware & Telemetry
+                </button>
+                <button data-role="community" onclick="switchTab('guidelines')" id="tab-guidelines" class="nav-tab px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-navy-700/60 flex items-center gap-2 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-shield-halved"></i> Emergency Guidelines & Help
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- EMERGENCY ALERT BANNER (DYNAMICALLY SHOWS WHEN INCIDENT ACTIVE) -->
+    <div id="emergencyBanner" class="hidden bg-alertRed border-b border-red-700 text-white px-4 py-3 shadow-lg pulse-red">
+        <div class="max-w-7xl mx-auto flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
+            <div class="flex items-start sm:items-center space-x-3">
+                <div class="p-2 bg-black/20 rounded-lg text-white">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl animate-bounce"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-base md:text-lg flex items-center gap-2">
+                        <span id="emergencyBannerTitle">BOIL WATER ADVISORY IN EFFECT: PRETORIA CENTRAL & ARCADIA</span>
+                    </h2>
+                    <p id="emergencyBannerDescription" class="text-xs md:text-sm text-red-100">
+                        Do not drink tap water unless it has been made safe according to official health guidance.
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                <button data-role="community" onclick="switchTab('guidelines')" class="px-3.5 py-1.5 bg-white text-alertRed font-bold rounded-lg text-xs hover:bg-red-50 transition-colors shadow">
+                    Safety Steps
+                </button>
+                <button onclick="dismissBanner()" class="p-1.5 text-red-200 hover:text-white rounded-lg text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN BODY CONTENT -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- TAB 1: LIVE DASHBOARD -->
+        <div id="view-dashboard" class="tab-view space-y-6">
+            
+            <!-- KEY METRICS CARDS -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                <!-- CARD 1: TURBIDITY (LDR) -->
+                <div class="bg-navy-800 border border-slate-700/70 rounded-2xl p-4 shadow-sm hover:border-slate-600 transition-all">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Community average turbidity</span>
+                        <div class="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center text-sm">
+                            <i class="fa-solid fa-eye"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-baseline justify-between">
+                        <div class="flex items-baseline space-x-1">
+                            <span id="metricTurbidityValue" class="text-2xl font-extrabold text-white font-mono">2.0</span>
+                            <span class="text-xs text-slate-400">NTU (estimated)</span>
+                        </div>
+                        <span id="metricTurbidityTag" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-teal-500/10 text-teal-400">
+                            Optimal
+                        </span>
+                    </div>
+                    <div class="mt-3 w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+                        <div id="metricTurbidityBar" class="bg-teal-500 h-1.5 rounded-full transition-all duration-500" style="width: 25%"></div>
+                    </div>
+                    <p class="mt-2 text-[11px] text-slate-400">Estimated from sensor readings; not a laboratory result.</p>
+                </div>
+
+                <!-- CARD 2: WATER TEMP (LM35) -->
+                <div data-role="municipal" class="bg-navy-800 border border-slate-700/70 rounded-2xl p-4 shadow-sm hover:border-slate-600 transition-all">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Water Temp (LM35)</span>
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center text-sm">
+                            <i class="fa-solid fa-temperature-half"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-baseline justify-between">
+                        <div class="flex items-baseline space-x-1">
+                            <span id="metricTempValue" class="text-2xl font-extrabold text-white font-mono">19.4</span>
+                            <span class="text-xs text-slate-400">°C</span>
+                        </div>
+                        <span id="metricTempTag" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500/10 text-blue-400">
+                            Normal
+                        </span>
+                    </div>
+                    <div class="mt-3 w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+                        <div id="metricTempBar" class="bg-blue-400 h-1.5 rounded-full transition-all duration-500" style="width: 48%"></div>
+                    </div>
+                    <p class="mt-2 text-[11px] text-slate-400">High bacterial risk above 28.0°C</p>
+                </div>
+
+                <!-- CARD 3: HARDWARE NODES ACTIVE -->
+                <div class="bg-navy-800 border border-slate-700/70 rounded-2xl p-4 shadow-sm hover:border-slate-600 transition-all">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Active monitoring nodes</span>
+                        <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-sm">
+                            <i class="fa-solid fa-network-wired"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-baseline justify-between">
+                        <div class="flex items-baseline space-x-1">
+                            <span id="activeNodesCount" class="text-2xl font-extrabold text-white font-mono">8 / 8</span>
+                        </div>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-500/10 text-purple-300">
+                            8 reporting
+                        </span>
+                    </div>
+                    <p class="mt-3 text-xs text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-check text-teal-400"></i> Suburb coverage overview
+                    </p>
+                    <p class="mt-1 text-[11px] text-slate-400">Grid mesh across 8 Tshwane zones</p>
+                </div>
+
+                <!-- CARD 4: RTC SYNC & UPTIME -->
+                <div data-role="municipal" class="bg-navy-800 border border-slate-700/70 rounded-2xl p-4 shadow-sm hover:border-slate-600 transition-all">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">DS1307 RTC Status</span>
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-sm">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-baseline justify-between">
+                        <div class="flex items-baseline space-x-1">
+                            <span class="text-2xl font-extrabold text-white font-mono">LOCKED</span>
+                        </div>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400">
+                            Synced
+                        </span>
+                    </div>
+                    <p class="mt-3 text-xs text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-bolt text-warningAmber"></i> Power Outage Backup Active
+                    </p>
+                    <p class="mt-1 text-[11px] text-slate-400">Hardware timestamps uncorrupted</p>
+                </div>
+            </div>
+            <p class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-100">
+                Prototype notice: status, node counts and readings on this page are simulated and are not official water-safety certification. Follow City of Tshwane and health-authority notices.
+            </p>
+
+            <section data-role="community" class="grid grid-cols-1 xl:grid-cols-3 gap-6" aria-label="Community safety and resilience tools">
+                <article class="xl:col-span-2 bg-navy-800 border border-slate-700/70 rounded-2xl p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-bold text-white"><i class="fa-solid fa-temperature-high text-warningAmber mr-2"></i>Safe-water boiling calculator</h2>
+                            <p class="mt-1 text-xs text-slate-400">A simple rule-based timer, not AI or medical advice. Check your local health authority's instructions first.</p>
+                        </div>
+                        <span class="rounded bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200">GUIDANCE DEMO</span>
+                    </div>
+                    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="boilVolume" class="mb-1 block text-xs font-semibold text-slate-300">Water volume (litres)</label>
+                            <input id="boilVolume" type="number" min="0.1" max="20" step="0.1" value="1.5" inputmode="decimal" oninput="updateBoilDurationGuidance()" class="w-full rounded-lg border border-slate-700 bg-navy-900 px-3 py-2 text-sm text-white">
+                        </div>
+                        <div>
+                            <label for="boilAltitude" class="mb-1 block text-xs font-semibold text-slate-300">Approximate altitude (metres)</label>
+                            <input id="boilAltitude" type="number" min="0" max="5000" step="50" value="1300" inputmode="numeric" oninput="updateBoilDurationGuidance()" class="w-full rounded-lg border border-slate-700 bg-navy-900 px-3 py-2 text-sm text-white">
+                        </div>
+                    </div>
+                    <p id="boilDurationGuidance" class="mt-3 text-xs text-slate-300" aria-live="polite"></p>
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <button type="button" id="startBoilTimerButton" onclick="startBoilTimer()" class="rounded-lg bg-warningAmber px-4 py-2 text-sm font-bold text-navy-900">Start timer at rolling boil</button>
+                        <button type="button" onclick="stopBoilTimer()" class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200">Stop timer</button>
+                        <output id="boilTimerDisplay" class="min-w-20 font-mono text-2xl font-bold text-white" aria-live="assertive">01:00</output>
+                    </div>
+                    <p id="boilTimerStatus" class="mt-2 text-xs text-slate-300" role="status" aria-live="polite">Start only after the water reaches a rolling boil. Volume affects heating time, not the recommended time at a rolling boil.</p>
+                    <div class="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100">
+                        Do not boil water if officials warn of chemical contamination. Boiling does not remove chemicals. After boiling, cool and store covered in a clean, sanitized, food-safe container; use within 24 hours as a conservative demo guide unless local officials advise otherwise.
+                    </div>
+                    <div class="mt-3 rounded-xl border border-slate-700 bg-navy-900/60 p-3">
+                        <h3 class="text-sm font-semibold text-white"><i class="fa-solid fa-baby text-amber-300 mr-1"></i>Infant formula guide</h3>
+                        <p class="mt-1 text-xs leading-5 text-slate-300">Ready-to-feed sterile formula is preferred when available during an advisory. For powdered formula, ask a health professional or clinic for current safe preparation guidance. Never use water under a chemical contamination warning.</p>
+                    </div>
+                </article>
+
+                <article class="bg-navy-800 border border-slate-700/70 rounded-2xl p-5">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-bold text-white"><i class="fa-solid fa-award text-teal-400 mr-2"></i>ClearScore resilience</h2>
+                            <p class="mt-1 text-xs text-slate-400">Neighborhood participation badge, not a water-quality or safety rating.</p>
+                        </div>
+                        <span class="rounded bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200">DEMO SCORE</span>
+                    </div>
+                    <label for="clearScoreSuburb" class="mt-4 mb-1 block text-xs font-semibold text-slate-300">Neighborhood</label>
+                    <select id="clearScoreSuburb" onchange="renderClearScore()" class="w-full rounded-lg border border-slate-700 bg-navy-900 px-3 py-2 text-sm text-white">
+                        <option value="arcadia">Arcadia</option><option value="cbd">Pretoria CBD</option><option value="groenkloof">Groenkloof</option><option value="centurion">Centurion</option><option value="hatfield">Hatfield</option><option value="silverton">Silverton</option><option value="sunnyside">Sunnyside</option><option value="bronkhorstspruit">Bronkhorstspruit</option>
+                    </select>
+                    <div class="mt-4 flex items-end gap-2">
+                        <span id="clearScoreValue" class="font-mono text-4xl font-extrabold text-teal-300">94</span>
+                        <span class="mb-1 text-xs text-slate-400">/ 100 demo points</span>
+                    </div>
+                    <p id="clearScoreBadge" class="mt-2 inline-flex rounded-full bg-teal-500/10 px-3 py-1 text-xs font-semibold text-teal-300">Water-wise neighbors</p>
+                    <p class="mt-3 text-xs leading-5 text-slate-300">Demo points reflect community report activity and self-reported conservation tips. Verified resolution data is not available in this prototype.</p>
+                    <p class="mt-2 text-xs leading-5 text-slate-300">Try one tip: collect rinse water for plants, fix a dripping tap, or take a shorter shower.</p>
+                    <button type="button" onclick="recordConservationTip()" class="mt-3 w-full rounded-lg border border-teal-500/40 px-3 py-2 text-xs font-semibold text-teal-300 hover:bg-teal-500/10">I tried a conservation tip</button>
+                    <p id="clearScoreStatus" class="mt-2 text-[11px] text-slate-400" role="status" aria-live="polite">Illustrative score; tip activity is stored only for this page session.</p>
+                </article>
+            </section>
+
+            <!-- LIVE CHART & LIVE STREAM ROW -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- CHART CONTAINER (2 COLS) -->
+                <div data-role="municipal" class="lg:col-span-2 bg-navy-800 border border-slate-700/70 rounded-2xl p-5 shadow-sm">
+                    <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-chart-area text-teal-400"></i> Live Telemetry Stream (ClearNode #01)
+                            </h2>
+                            <p class="text-xs text-slate-400">Real-time optical turbidity (LDR ADC) & temperature (°C) tracking over RS485</p>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs">
+                            <span class="flex items-center gap-1 text-teal-400"><i class="fa-solid fa-circle text-[8px]"></i> Turbidity</span>
+                            <span class="flex items-center gap-1 text-blue-400"><i class="fa-solid fa-circle text-[8px]"></i> Temp (°C)</span>
+                        </div>
+                    </div>
+
+                    <!-- Canvas for Chart.js -->
+                    <div class="h-64 sm:h-72 w-full">
+                        <canvas id="telemetryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- SUBURB SNAPSHOT SIDEBAR (1 COL) -->
+                <div class="bg-navy-800 border border-slate-700/70 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-location-crosshairs text-teal-400"></i> Local Zone Highlights
+                            </h2>
+                            <button onclick="switchTab('suburbs')" class="text-xs text-teal-400 hover:underline">View All</button>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-4">Quick summary of monitored Tshwane municipal areas:</p>
+
+                        <div id="quickSuburbList" class="space-y-3">
+                            <!-- Populated dynamically by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-t border-slate-700/60 text-xs text-slate-400 flex items-center justify-between">
+                        <span><i class="fa-solid fa-satellite-dish text-teal-400 mr-1"></i> Continuous Polling</span>
+                        <span class="font-mono text-slate-300">Interval: 2.0s</span>
+                    </div>
+                </div>
+            </div>
+
+            <section data-role="community" class="grid grid-cols-1 lg:grid-cols-2 gap-6" aria-label="Community reporting and offline access">
+                <div class="bg-navy-800 border border-slate-700/70 rounded-2xl p-5">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-bold text-white"><i class="fa-solid fa-people-group text-teal-400 mr-2"></i>Community incident reports</h2>
+                            <p class="text-xs text-slate-400 mt-1">Recent reports from residents. Reports are unverified until checked by municipal staff.</p>
+                        </div>
+                        <button type="button" onclick="switchTab('guidelines')" class="shrink-0 rounded-lg bg-teal-500 px-3 py-2 text-xs font-bold text-navy-900">Report an issue</button>
+                    </div>
+                    <div id="communityReportFeed" class="mt-4 space-y-3" aria-live="polite">
+                        <p class="text-xs text-slate-400">No community reports have been submitted yet.</p>
+                    </div>
+                </div>
+                <div class="bg-navy-800 border border-slate-700/70 rounded-2xl p-5">
+                    <h2 class="text-base font-bold text-white"><i class="fa-solid fa-mobile-screen-button text-teal-400 mr-2"></i>Check by feature phone</h2>
+                    <p class="text-xs text-slate-400 mt-1">Dial <strong class="text-white">*120*2782#</strong> for water safety guidance. This on-page demo simulates the menu; live USSD requires a carrier service.</p>
+                    <div class="mt-4 flex flex-col sm:flex-row gap-2">
+                        <label for="ussdSuburb" class="sr-only">Choose your suburb</label>
+                        <select id="ussdSuburb" class="min-w-0 flex-1 rounded-lg border border-slate-700 bg-navy-900 px-3 py-2 text-sm text-white">
+                            <option value="cbd">Pretoria CBD</option><option value="arcadia">Arcadia</option><option value="hatfield">Hatfield</option><option value="groenkloof">Groenkloof</option><option value="centurion">Centurion</option><option value="silverton">Silverton</option><option value="sunnyside">Sunnyside</option><option value="bronkhorstspruit">Bronkhorstspruit</option>
+                        </select>
+                        <button type="button" onclick="simulateUssdQuery()" class="rounded-lg border border-teal-500/50 bg-teal-500/10 px-4 py-2 text-sm font-semibold text-teal-300">Simulate USSD check</button>
+                    </div>
+                    <p id="ussdResult" class="mt-3 min-h-5 text-sm text-slate-300" aria-live="polite">Select a suburb to simulate a safety query.</p>
+                </div>
+            </section>
+
+            <!-- EMERGENCY REPORTING & RESOURCES SHORTCUT -->
+            <div data-role="community" class="bg-gradient-to-r from-navy-800 to-navy-700 border border-slate-700/80 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-2xl flex-shrink-0">
+                        <i class="fa-solid fa-bullhorn"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-base">Spotted an unannounced water outage or cloudiness?</h3>
+                        <p class="text-xs text-slate-300 mt-0.5">Submit a community report to share a local issue with neighbors and municipal staff.</p>
+                    </div>
+                </div>
+                <button onclick="switchTab('guidelines')" class="px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-navy-900 font-bold rounded-xl text-xs transition-all shadow-lg shadow-teal-500/20 flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-paper-plane"></i> Submit Community Report
+                </button>
+            </div>
+
+            <section data-role="municipal" class="space-y-6" aria-label="Municipal operations dashboard">
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <article class="bg-navy-800 border border-slate-700/70 rounded-2xl p-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h2 class="text-base font-bold text-white"><i class="fa-solid fa-map-location-dot text-teal-400 mr-2"></i>Predictive contamination heatmap</h2>
+                                <p class="mt-1 text-xs text-slate-400">Illustrative downstream risk based on demo node readings, assumed pipe distances and simulated flow velocity.</p>
+                            </div>
+                            <span class="shrink-0 rounded bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200">SIMULATED</span>
+                        </div>
+                        <div id="predictionHeatmap" class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2" aria-live="polite"></div>
+                        <div class="mt-4">
+                            <h3 class="text-xs font-semibold text-slate-200">Downstream flow predictions</h3>
+                            <div id="flowPredictions" class="mt-2 space-y-2" aria-live="polite"></div>
+                        </div>
+                        <p class="mt-3 text-[11px] leading-4 text-amber-200">Planning demo only: flow velocity is assumed, not derived from live valve telemetry. Turbidity is not a test for toxic chemicals. Do not use these estimates for operational decisions.</p>
+                    </article>
+
+                    <article class="bg-navy-800 border border-slate-700/70 rounded-2xl p-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h2 class="text-base font-bold text-white"><i class="fa-solid fa-faucet-drip text-blue-400 mr-2"></i>Smart valve / solenoid override</h2>
+                                <p class="mt-1 text-xs text-slate-400">Demo switches show the proposed isolation workflow per monitored node.</p>
+                            </div>
+                            <span class="shrink-0 rounded bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200">NO LIVE VALVE CONTROL</span>
+                        </div>
+                        <div id="valveControls" class="mt-4 space-y-2" aria-live="polite"></div>
+                        <p id="valveActionStatus" class="mt-3 min-h-5 text-xs text-slate-300" role="status" aria-live="polite">No valve actions recorded in this demo.</p>
+                    </article>
+                </div>
+
+                <article class="bg-navy-800 border border-slate-700/70 rounded-2xl p-5">
+                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-bold text-white"><i class="fa-solid fa-screwdriver-wrench text-warningAmber mr-2"></i>Maintenance tickets & field dispatch</h2>
+                            <p class="mt-1 text-xs text-slate-400">Demo tickets for common sensor and node alerts. Assign a technician and update ticket status.</p>
+                        </div>
+                        <span class="shrink-0 rounded bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200">SIMULATED WORKFLOW</span>
+                    </div>
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="w-full min-w-[720px] text-left text-xs">
+                            <thead class="text-slate-400">
+                                <tr class="border-b border-slate-700">
+                                    <th class="px-3 py-2 font-semibold">Ticket / node</th>
+                                    <th class="px-3 py-2 font-semibold">Issue</th>
+                                    <th class="px-3 py-2 font-semibold">Technician</th>
+                                    <th class="px-3 py-2 font-semibold">Status</th>
+                                    <th class="px-3 py-2 font-semibold">Dispatch</th>
+                                </tr>
+                            </thead>
+                            <tbody id="maintenanceTicketRows"></tbody>
+                        </table>
+                    </div>
+                    <p class="mt-3 text-[11px] text-slate-400">Tickets are prototype examples only; assignments are not sent to real field staff.</p>
+                </article>
+            </section>
+
+        </div>
+
+        <!-- TAB 2: SUBURBS MAP GRID -->
+        <div id="view-suburbs" class="tab-view hidden space-y-6">
+            <div class="flex items-center justify-between flex-wrap gap-4 bg-navy-800 p-4 rounded-2xl border border-slate-700">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-city text-teal-400"></i> Tshwane Suburbs Water Quality Grid
+                    </h2>
+                    <p class="text-xs text-slate-400">Live monitoring across primary municipal supply reservoirs and residential distribution lines.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="suburbSearch" oninput="filterSuburbs()" placeholder="Search suburb..." class="bg-navy-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500">
+                </div>
+            </div>
+
+            <!-- SUBURB CARDS GRID -->
+            <div id="suburbsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Dynamically Populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- TAB 3: RS485 HARDWARE & SIMULATION CONTROLS -->
+        <div data-role="municipal" id="view-telemetry" class="tab-view hidden space-y-6">
+
+            <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="lg:col-span-2 bg-navy-800 border border-slate-700/80 rounded-2xl p-5">
+                    <h2 class="text-base font-bold text-white"><i class="fa-solid fa-tower-broadcast text-alertRed mr-2"></i>Manual advisory override</h2>
+                    <p class="mt-1 text-xs text-slate-400">Demo control only. In production, require authenticated, authorized server-side actions and an immutable audit trail.</p>
+                    <div class="mt-4 flex flex-col sm:flex-row gap-2">
+                        <label for="advisoryScope" class="sr-only">Advisory area</label>
+                        <select id="advisoryScope" class="min-w-0 flex-1 rounded-lg border border-slate-700 bg-navy-900 px-3 py-2 text-sm text-white">
+                            <option value="citywide">All monitored areas (city-wide)</option>
+                            <option value="cbd">Pretoria CBD</option><option value="arcadia">Arcadia</option><option value="hatfield">Hatfield</option><option value="groenkloof">Groenkloof</option><option value="centurion">Centurion</option><option value="silverton">Silverton</option><option value="sunnyside">Sunnyside</option><option value="bronkhorstspruit">Bronkhorstspruit</option>
+                        </select>
+                        <button type="button" onclick="applyManualAdvisory(true)" class="rounded-lg bg-alertRed px-4 py-2 text-sm font-bold text-white">Issue advisory</button>
+                        <button type="button" onclick="applyManualAdvisory(false)" class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200">Clear advisory</button>
+                    </div>
+                    <p id="overrideFeedback" class="mt-3 text-xs text-slate-300" role="status" aria-live="polite">No manual override applied.</p>
+                </div>
+                <div class="bg-navy-800 border border-slate-700/80 rounded-2xl p-5">
+                    <h2 class="text-base font-bold text-white"><i class="fa-solid fa-heart-pulse text-teal-400 mr-2"></i>System & hardware health</h2>
+                    <dl class="mt-3 space-y-2 text-xs">
+                        <div class="flex justify-between gap-3"><dt class="text-slate-400">Packet delivery</dt><dd class="font-mono text-teal-300">99.8% (simulated)</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-slate-400">Packet loss</dt><dd class="font-mono text-slate-200">0.2% (simulated)</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-slate-400">RS485 gateway</dt><dd class="font-mono text-teal-300">Online (simulated)</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-slate-400">DS1307 clock</dt><dd class="font-mono text-teal-300">Synchronized (simulated)</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-slate-400">SSDLC</dt><dd class="font-mono text-amber-300">Demo only; not assessed</dd></div>
+                    </dl>
+                </div>
+            </section>
+
+            <section class="bg-navy-800 border border-slate-700/80 rounded-2xl p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-bold text-white"><i class="fa-solid fa-clipboard-list text-teal-400 mr-2"></i>Community incident reports</h2>
+                        <p class="mt-1 text-xs text-slate-400">Resident-submitted reports shown for municipal triage. Submissions are not independently verified.</p>
+                    </div>
+                    <button type="button" onclick="generateComplianceReport()" class="rounded-lg bg-teal-500 px-4 py-2 text-sm font-bold text-navy-900"><i class="fa-solid fa-file-pdf mr-1"></i>Generate SANS 241 report</button>
+                </div>
+                <p id="complianceReportStatus" class="mt-2 text-xs text-slate-300" role="status" aria-live="polite">Generates a printable demo report; use the browser's print dialog to save as PDF.</p>
+                <div id="adminIncidentReports" class="mt-4 space-y-3" aria-live="polite">
+                    <p class="text-xs text-slate-400">No community reports have been submitted yet.</p>
+                </div>
+            </section>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- HARDWARE SIMULATION CONTROLLER (1 COL) -->
+                <div class="bg-navy-800 border border-slate-700/80 rounded-2xl p-5 space-y-5 shadow-sm">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-sliders text-teal-400"></i> ClearNode #01 Hardware Simulator
+                            </h2>
+                            <span class="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded font-mono">Bare-Metal C</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">Adjust physical inputs to simulate water clarity shifts and temperature changes live.</p>
+                    </div>
+
+                    <!-- SLIDER 1: TURBIDITY (LDR) -->
+                    <div class="bg-navy-900/80 p-3.5 rounded-xl border border-slate-700/60 space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <label class="font-semibold text-slate-200">LDR Turbidity Sensor (ADC Raw)</label>
+                            <span id="sliderTurbidityVal" class="font-mono font-bold text-teal-400">245 ADC</span>
+                        </div>
+                        <input type="range" id="inputTurbidity" min="50" max="950" value="245" oninput="updateSimulatedValues()" class="w-full accent-teal-500 cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                            <span>50 (Crystal Clear)</span>
+                            <span class="text-alertRed">500 (Threshold)</span>
+                            <span>950 (Muddy)</span>
+                        </div>
+                    </div>
+
+                    <!-- SLIDER 2: TEMPERATURE (LM35) -->
+                    <div class="bg-navy-900/80 p-3.5 rounded-xl border border-slate-700/60 space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <label class="font-semibold text-slate-200">LM35 Temperature Sensor (°C)</label>
+                            <span id="sliderTempVal" class="font-mono font-bold text-blue-400">19.4 °C</span>
+                        </div>
+                        <input type="range" id="inputTemp" min="10" max="40" step="0.5" value="19.4" oninput="updateSimulatedValues()" class="w-full accent-blue-500 cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                            <span>10°C (Cold)</span>
+                            <span class="text-warningAmber">28°C (Bacterial Threshold)</span>
+                            <span>40°C (Hot)</span>
+                        </div>
+                    </div>
+
+                    <!-- HARDWARE PRESETS -->
+                    <div class="space-y-2">
+                        <label class="text-xs font-semibold text-slate-300">Quick Simulation Presets:</label>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <button onclick="setHardwarePreset(180, 18.5)" class="px-2.5 py-1.5 bg-navy-700 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-600 transition text-left">
+                                <i class="fa-solid fa-check text-teal-400 mr-1"></i> Normal Tap Water
+                            </button>
+                            <button onclick="setHardwarePreset(680, 29.5)" class="px-2.5 py-1.5 bg-navy-700 hover:bg-alertRed/20 text-alertRed rounded-lg border border-red-500/40 transition text-left">
+                                <i class="fa-solid fa-circle-exclamation mr-1"></i> Contaminated Burst
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-teal-500/10 border border-teal-500/20 rounded-xl text-xs text-slate-300 space-y-1">
+                        <div class="font-semibold text-teal-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-microchip"></i> Node Architecture
+                        </div>
+                        <p class="text-[11px] text-slate-400">Microcontroller ATmega328P running bare-metal C with ADC prescaler 128 and MAX485 differential transceiver.</p>
+                    </div>
+                </div>
+
+                <!-- RS485 SERIAL CONSOLE STREAM (2 COLS) -->
+                <div class="lg:col-span-2 bg-navy-800 border border-slate-700/80 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+                    <div>
+                        <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-terminal text-teal-400"></i> RS485 Serial Bus Output (ClearHub Gateway)
+                            </h2>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="clearSerialConsole()" class="px-2.5 py-1 bg-navy-900 hover:bg-navy-700 text-slate-300 text-xs rounded border border-slate-700">
+                                    Clear Console
+                                </button>
+                                <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-mono rounded">Baud: 9600 8N1</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-3">Real-time raw UART telemetry parsed directly from industrial RS485 twisted-pair differential lines:</p>
+
+                        <!-- TERMINAL SCREEN -->
+                        <div id="serialTerminal" class="bg-navy-900 border border-slate-700/90 rounded-xl p-4 font-mono text-xs text-teal-400 h-80 overflow-y-auto space-y-1.5 shadow-inner">
+                            <div class="text-slate-500">// ClearHub Gateway Serial Interface v1.0 initialized...</div>
+                            <div class="text-slate-500">// Connected to MAX485 bus on COM3 @ 9600 baud. Receiving packets...</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400 font-mono">
+                        <span>Status: RECEIVING_TELEMETRY</span>
+                        <span>CRC32: OK (0 Errors)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PROTEUS SIMULATION SCHEMATIC OVERVIEW -->
+            <div class="bg-navy-800 border border-slate-700/80 rounded-2xl p-5">
+                <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-diagram-project text-teal-400"></i> Hardware Verification Blueprint (Proteus & Physical)
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 text-xs">
+                    <div class="p-3.5 bg-navy-900/60 rounded-xl border border-slate-700/60">
+                        <div class="font-bold text-teal-400 mb-1">1. Optical Sensing Node</div>
+                        <p class="text-slate-400">LDR and LED configured across sample tube. Unfiltered particles scatter light, altering resistance fed directly into ADC Channel 0.</p>
+                    </div>
+                    <div class="p-3.5 bg-navy-900/60 rounded-xl border border-slate-700/60">
+                        <div class="font-bold text-blue-400 mb-1">2. RTC & Thermal Logging</div>
+                        <p class="text-slate-400">DS1307 RTC communicates over I2C (SDA/SCL) providing continuous timestamping; LM35 feeds ADC Channel 1 for temperature tracking.</p>
+                    </div>
+                    <div class="p-3.5 bg-navy-900/60 rounded-xl border border-slate-700/60">
+                        <div class="font-bold text-purple-400 mb-1">3. RS485 Long-Distance Bus</div>
+                        <p class="text-slate-400">MAX485 differential serial transceiver ensures data reaches the local gateway across 1km+ without dependence on cellular networks.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- TAB 4: EMERGENCY GUIDELINES & RESOURCES -->
+        <div data-role="community" id="view-guidelines" class="tab-view hidden space-y-6">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- GUIDELINES & STEPS (2 COLS) -->
+                <div class="lg:col-span-2 space-y-6">
+                    
+                    <!-- BOIL WATER STEPS -->
+                    <div class="bg-navy-800 border border-slate-700/80 rounded-2xl p-6 shadow-sm">
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                            <i class="fa-solid fa-fire-burner text-warningAmber"></i> Emergency Boil-Water & Filtration Protocol
+                        </h2>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="p-4 bg-navy-900/80 rounded-xl border border-slate-700 flex items-start space-x-3">
+                                <span class="w-7 h-7 rounded-full bg-warningAmber/20 text-warningAmber flex items-center justify-center font-bold text-sm flex-shrink-0">1</span>
+                                <div>
+                                    <h3 class="font-semibold text-white text-sm">Rolling boil</h3>
+                                    <p class="text-xs text-slate-400 mt-1">During an advisory, bring water to a rolling boil for 1 minute (or follow the specific instruction from your health authority). Boiling does not remove chemical contamination.</p>
+                                </div>
+                            </div>
+
+                            <div class="p-4 bg-navy-900/80 rounded-xl border border-slate-700 flex items-start space-x-3">
+                                <span class="w-7 h-7 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-sm flex-shrink-0">2</span>
+                                <div>
+                                    <h3 class="font-semibold text-white text-sm">Optical & Cloth Filtration</h3>
+                                    <p class="text-xs text-slate-400 mt-1">If water is visibly cloudy, let it settle and strain through a clean cloth or coffee filter before disinfection. Filtration alone does not make unsafe water safe.</p>
+                                </div>
+                            </div>
+
+                            <div class="p-4 bg-navy-900/80 rounded-xl border border-slate-700 flex items-start space-x-3">
+                                <span class="w-7 h-7 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm flex-shrink-0">3</span>
+                                <div>
+                                    <h3 class="font-semibold text-white text-sm">Follow official disinfection advice</h3>
+                                    <p class="text-xs text-slate-400 mt-1">Use only an approved water disinfectant and follow its label or local health-authority instructions. Do not guess bleach quantities; never mix bleach with other cleaners.</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-navy-800 border border-amber-500/30 rounded-2xl p-5 shadow-sm">
+                                <h2 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-baby text-amber-300"></i>Infant formula during an advisory</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-300">Use commercially prepared sterile liquid formula if available. If powdered formula must be used, follow current advice from your health professional or local health authority about safe water preparation; never use water covered by a chemical contamination warning. Contact a clinic for infant-specific guidance.</p>
+                            </div>
+
+                            <div class="p-4 bg-navy-900/80 rounded-xl border border-slate-700 flex items-start space-x-3">
+                                <span class="w-7 h-7 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-sm flex-shrink-0">4</span>
+                                <div>
+                                    <h3 class="font-semibold text-white text-sm">Safe Storage</h3>
+                                    <p class="text-xs text-slate-400 mt-1">Store boiled water in clean, covered food-grade containers away from direct heat or light.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TSHWANE EMERGENCY WATER DISTRIBUTION POINTS -->
+                    <div class="bg-navy-800 border border-slate-700/80 rounded-2xl p-6 shadow-sm">
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                            <i class="fa-solid fa-truck-droplet text-teal-400"></i> Emergency Tanker Distribution Points in Tshwane
+                        </h2>
+                        
+                        <div class="space-y-3">
+                            <div class="p-3.5 bg-navy-900/60 rounded-xl border border-slate-700/80 flex items-center justify-between flex-wrap gap-2">
+                                <div>
+                                    <div class="font-bold text-white text-sm">Pretoria CBD - Church Square Tanker Point</div>
+                                    <div class="text-xs text-slate-400">Corner Paul Kruger St & Madiba St</div>
+                                </div>
+                                <span class="px-2.5 py-1 bg-teal-500/20 text-teal-300 font-semibold text-xs rounded-full">Stationary Tanker Active</span>
+                            </div>
+
+                            <div class="p-3.5 bg-navy-900/60 rounded-xl border border-slate-700/80 flex items-center justify-between flex-wrap gap-2">
+                                <div>
+                                    <div class="font-bold text-white text-sm">Arcadia - Community Park Distribution Hub</div>
+                                    <div class="text-xs text-slate-400">Park Street & Stanza Bopape St</div>
+                                </div>
+                                <span class="px-2.5 py-1 bg-teal-500/20 text-teal-300 font-semibold text-xs rounded-full">Operating until 20:00</span>
+                            </div>
+
+                            <div class="p-3.5 bg-navy-900/60 rounded-xl border border-slate-700/80 flex items-center justify-between flex-wrap gap-2">
+                                <div>
+                                    <div class="font-bold text-white text-sm">Groenkloof - Fountains Valley Water Reservoir</div>
+                                    <div class="text-xs text-slate-400">Christina de Wit Ave</div>
+                                </div>
+                                <span class="px-2.5 py-1 bg-blue-500/20 text-blue-300 font-semibold text-xs rounded-full">Backup Supply Tank</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- EMERGENCY CONTACTS & COMMUNITY REPORT FORM (1 COL) -->
+                <div class="space-y-6">
+                    
+                    <!-- COMMUNITY REPORT FORM -->
+                    <div class="bg-navy-800 border border-slate-700/80 rounded-2xl p-5 shadow-sm space-y-4">
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-flag text-teal-400"></i> Submit Community Incident Report
+                        </h2>
+                        <form onsubmit="handleReportSubmit(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Your Suburb / Location</label>
+                                <select id="reportSuburb" required class="w-full bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500">
+                                    <option value="Pretoria CBD">Pretoria CBD</option>
+                                    <option value="Arcadia">Arcadia</option>
+                                    <option value="Groenkloof">Groenkloof</option>
+                                    <option value="Centurion">Centurion</option>
+                                    <option value="Hatfield">Hatfield</option>
+                                    <option value="Silverton">Silverton</option>
+                                    <option value="Sunnyside">Sunnyside</option>
+                                    <option value="Bronkhorstspruit">Bronkhorstspruit</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Observed Issue</label>
+                                <select id="reportIssue" class="w-full bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500">
+                                    <option value="Discolored / Muddy Water">Discolored / Muddy Water</option>
+                                    <option value="Unusual Chemical Smell or Taste">Unusual Chemical Smell or Taste</option>
+                                    <option value="Low water pressure">Low water pressure</option>
+                                    <option value="Complete Water Outage / Zero Pressure">Complete Water Outage / Zero Pressure</option>
+                                    <option value="Pipe Burst / Infrastructure Leak">Pipe Burst / Infrastructure Leak</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Details & Street Address</label>
+                                <textarea id="reportDetails" rows="3" placeholder="Describe water clarity, smell, or flow conditions..." required class="w-full bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"></textarea>
+                            </div>
+
+                            <button type="submit" class="w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-navy-900 font-bold rounded-xl text-xs transition-all shadow-md">
+                                Submit Report
+                            </button>
+                            <p id="reportSubmitStatus" class="text-xs text-slate-300" role="status" aria-live="polite"></p>
+                        </form>
+                    </div>
+
+                    <!-- EMERGENCY CONTACT NUMBERS -->
+                    <div class="bg-navy-800 border border-slate-700/80 rounded-2xl p-5 shadow-sm space-y-3">
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-phone-volume text-alertRed"></i> Essential Hotline Contacts
+                        </h2>
+
+                        <div class="space-y-2 text-xs">
+                            <div class="p-2.5 bg-navy-900/60 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <div class="font-bold text-slate-200">City of Tshwane Water Desk</div>
+                                    <div class="text-[11px] text-slate-400">012 358 9999</div>
+                                </div>
+                                <a href="tel:0123589999" class="p-2 bg-slate-700 hover:bg-teal-500 hover:text-navy-900 rounded-lg text-slate-200 transition">
+                                    <i class="fa-solid fa-phone"></i>
+                                </a>
+                            </div>
+
+                            <div class="p-2.5 bg-navy-900/60 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <div class="font-bold text-slate-200">Tshwane Disaster Management</div>
+                                    <div class="text-[11px] text-slate-400">107 / 012 310 6300</div>
+                                </div>
+                                <a href="tel:107" class="p-2 bg-slate-700 hover:bg-teal-500 hover:text-navy-900 rounded-lg text-slate-200 transition">
+                                    <i class="fa-solid fa-phone"></i>
+                                </a>
+                            </div>
+
+                            <div class="p-2.5 bg-navy-900/60 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <div class="font-bold text-slate-200">Water Sanitation SMS Toll-Free</div>
+                                    <div class="text-[11px] text-slate-400">SMS 'WATER' to 082 612 2121</div>
+                                </div>
+                                <span class="p-2 bg-slate-800 rounded-lg text-slate-400">
+                                    <i class="fa-solid fa-comment-sms"></i>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-navy-800 border-t border-slate-700/80 py-6 mt-12 text-xs text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-droplet text-teal-400"></i>
+                <span class="font-semibold text-white">ClearCommunity Platform</span>
+                <span>— FNB App of the Year Entry</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span>Microcontroller C Bare-Metal Edge</span>
+                <span>•</span>
+                <span>RS485 Serial Network</span>
+                <span>•</span>
+                <span>Node.js Gateway</span>
+            </div>
+            <div class="text-slate-400">
+                &copy; 2026 ClearCommunity Tshwane.
+            </div>
+        </div>
+    </footer>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // GLOBAL STATE
+        let currentRole = null;
+        let isIncidentActive = false;
+        let isBannerDismissed = false;
+        const activeAdvisories = new Set();
+        const communityReports = [];
+        let simulatedTurbidity = 245; // ADC raw value
+        let simulatedTemp = 19.4;     // °C
+        let telemetryChart = null;
+        let serialLogCount = 0;
+
+        // TSHWANE SUBURBS DATA
+        const suburbsData = [
+            { id: 'cbd', name: 'Pretoria CBD', turbidity: 240, temp: 19.8, status: 'SAFE', node: 'ClearNode #01', lastSync: '2 secs ago' },
+            { id: 'arcadia', name: 'Arcadia', turbidity: 220, temp: 19.2, status: 'SAFE', node: 'ClearNode #02', lastSync: '4 secs ago' },
+            { id: 'groenkloof', name: 'Groenkloof', turbidity: 180, temp: 18.5, status: 'SAFE', node: 'ClearNode #03', lastSync: '1 sec ago' },
+            { id: 'centurion', name: 'Centurion', turbidity: 210, temp: 20.1, status: 'SAFE', node: 'ClearNode #04', lastSync: '3 secs ago' },
+            { id: 'hatfield', name: 'Hatfield', turbidity: 250, temp: 19.6, status: 'SAFE', node: 'ClearNode #05', lastSync: '2 secs ago' },
+            { id: 'silverton', name: 'Silverton', turbidity: 290, temp: 20.4, status: 'SAFE', node: 'ClearNode #06', lastSync: '5 secs ago' },
+            { id: 'sunnyside', name: 'Sunnyside', turbidity: 230, temp: 19.5, status: 'SAFE', node: 'ClearNode #07', lastSync: '2 secs ago' },
+            { id: 'bronkhorstspruit', name: 'Bronkhorstspruit', turbidity: 310, temp: 21.0, status: 'SAFE', node: 'ClearNode #08', lastSync: '6 secs ago' }
+        ];
+        const downstreamRoutes = [
+            { from: 'cbd', to: 'arcadia', distanceKm: 1.5, velocityMps: 0.6 },
+            { from: 'arcadia', to: 'hatfield', distanceKm: 1.2, velocityMps: 0.5 },
+            { from: 'cbd', to: 'sunnyside', distanceKm: 1.0, velocityMps: 0.4 },
+            { from: 'hatfield', to: 'silverton', distanceKm: 2.4, velocityMps: 0.8 }
+        ];
+        const isolatedValveNodes = new Set();
+        const neighborhoodBaseScores = {
+            arcadia: 94, cbd: 89, groenkloof: 92, centurion: 87,
+            hatfield: 91, silverton: 85, sunnyside: 88, bronkhorstspruit: 83
+        };
+        const conservationTipsCompleted = new Map();
+        const neighborhoodReportsSubmitted = new Map();
+        const maintenanceTickets = [
+            { id: 'MT-001', node: 'ClearNode #03', issue: 'LDR sensor calibration drift detected (demo)', technician: '', status: 'Open' },
+            { id: 'MT-002', node: 'ClearNode #06', issue: 'Low battery warning (demo)', technician: '', status: 'Open' }
+        ];
+        let nextMaintenanceTicketId = 3;
+        let communityLanguage = 'en';
+        let boilTimerInterval = null;
+        let boilTimerEndsAt = null;
+        let boilTimerDurationSeconds = 60;
+
+        const communityTranslations = {
+            en: {
+                safe: 'SYSTEM SAFE',
+                advisory: 'BOIL WATER ADVISORY',
+                bannerTitle: 'BOIL-WATER ADVISORY IN EFFECT',
+                bannerDescription: 'Do not drink tap water unless it has been made safe according to official health guidance.',
+                safetySteps: 'Safety Steps',
+                safeArea: 'Normal / Safe',
+                advisoryArea: 'BOIL-WATER ADVISORY',
+                safeShort: 'SAFE',
+                advisoryShort: 'BOIL ADVISORY',
+                ussdAdvisory: 'BOIL-WATER ADVISORY. Follow the safety guidance and official notices.',
+                ussdSafe: 'No active boil-water advisory shown in this demo. Check official notices before drinking if water looks or smells unusual.'
+            },
+            af: {
+                safe: 'STELSEL VEILIG',
+                advisory: 'KOOKWATERWAARSKUWING',
+                bannerTitle: 'KOOKWATERWAARSKUWING VAN KRAG',
+                bannerDescription: 'Moenie kraanwater drink tensy dit volgens amptelike gesondheidsriglyne veilig gemaak is nie.',
+                safetySteps: 'Veiligheidsstappe',
+                safeArea: 'Normaal / Veilig',
+                advisoryArea: 'KOOKWATERWAARSKUWING',
+                safeShort: 'VEILIG',
+                advisoryShort: 'KOOKWAARSKUWING',
+                ussdAdvisory: 'KOOKWATERWAARSKUWING. Volg die veiligheidsriglyne en amptelike kennisgewings.',
+                ussdSafe: 'Geen aktiewe kookwaterwaarskuwing word in hierdie demonstrasie gewys nie. Raadpleeg amptelike kennisgewings as water vreemd lyk of ruik.'
+            },
+            zu: {
+                safe: 'UHLELO LUPHEPHILE',
+                advisory: 'ISEXWAYISO SOKUBILISA AMANZI',
+                bannerTitle: 'ISEXWAYISO SOKUBILISA AMANZI SIYASEBENZA',
+                bannerDescription: 'Ungawaphuzi amanzi ompompi ngaphandle kokuthi enziwe aphephe ngokwemiyalelo yezempilo esemthethweni.',
+                safetySteps: 'Izinyathelo zokuphepha',
+                safeArea: 'Kujwayelekile / Kuphephile',
+                advisoryArea: 'ISEXWAYISO SOKUBILISA AMANZI',
+                safeShort: 'KUPHEPHILE',
+                advisoryShort: 'BILISA AMANZI',
+                ussdAdvisory: 'ISEXWAYISO SOKUBILISA AMANZI. Landela iziqondiso zokuphepha nezaziso ezisemthethweni.',
+                ussdSafe: 'Kule demo akukho sexwayiso sokubilisa esisebenzayo esiboniswayo. Hlola izaziso ezisemthethweni uma amanzi ebukeka noma enuka ngendlela engavamile.'
+            },
+            st: {
+                safe: 'SISTIMI E SIRELETSEHILE',
+                advisory: 'TEMOSO YA HO BEDISA METSI',
+                bannerTitle: 'TEMOSO YA HO BEDISA METSI E SEBETSA',
+                bannerDescription: 'O se ke wa nwa metsi a pompo ntle le haeba a hlwekisitswe ho latela tataiso ya semmuso ya bophelo bo botle.',
+                safetySteps: 'Mehato ya polokeho',
+                safeArea: 'Tlwaelehileng / E sireletsehile',
+                advisoryArea: 'TEMOSO YA HO BEDISA METSI',
+                safeShort: 'E SIRELETSEHILE',
+                advisoryShort: 'BEDISA METSI',
+                ussdAdvisory: 'TEMOSO YA HO BEDISA METSI. Latela tataiso ya polokeho le ditsebiso tsa semmuso.',
+                ussdSafe: 'Demo ena ha e bontshe temoso ya hajwale ya ho bedisa metsi. Sheba ditsebiso tsa semmuso haeba metsi a shebahala kapa a nkga ka tsela e sa tlwaelehang.'
+            }
+        };
+        const communityCopyTranslations = {
+            'Welcome to ClearCommunity': { af: 'Welkom by ClearCommunity', zu: 'Siyakwamukela ku-ClearCommunity', st: 'Rea u amohela ho ClearCommunity' },
+            'Choose your portal to continue.': { af: 'Kies jou portaal om voort te gaan.', zu: 'Khetha ingosi ozoqhubeka ngayo.', st: 'Kgetha portal eo o tla tswelang pele ka yona.' },
+            'Community Access': { af: 'Gemeenskapstoegang', zu: 'Ukungena komphakathi', st: 'Phihlello ya setjhaba' },
+            'Municipal Login': { af: 'Munisipale aanmelding', zu: 'Ukungena kukamasipala', st: 'Ho kena ha masepala' },
+            'Sign in to view public water-quality alerts, submit community reports, and find emergency guidance.': { af: 'Meld aan om openbare waarskuwings oor watergehalte te sien, gemeenskapsverslae in te dien en noodriglyne te kry.', zu: 'Ngena ukuze ubone izexwayiso zomphakathi ngekhwalithi yamanzi, uthumele imibiko yomphakathi, futhi uthole iziqondiso eziphuthumayo.', st: 'Kena ho bona ditemoso tsa setjhaba tsa boleng ba metsi, ho romela ditlaleho tsa setjhaba le ho fumana tataiso ya tshohanyetso.' },
+            'Language': { af: 'Taal', zu: 'Ulimi', st: 'Puo' },
+            'Choose community language': { af: 'Kies gemeenskapstaal', zu: 'Khetha ulimi lomphakathi', st: 'Kgetha puo ya setjhaba' },
+            'Email address': { af: 'E-posadres', zu: 'Ikheli le-imeyili', st: 'Aterese ya imeile' },
+            'Password': { af: 'Wagwoord', zu: 'Iphasiwedi', st: 'Lekunutu' },
+            'At least 8 characters': { af: 'Minstens 8 karakters', zu: 'Okungenani izinhlamvu eziyi-8', st: 'Bonyane ditlhaku tse 8' },
+            'Prototype sign-in only: credentials are not verified or stored. Production login requires secure server-side authentication.': { af: 'Prototipe-aanmelding: besonderhede word nie nagegaan of gestoor nie. ’n Regte stelsel vereis veilige bediener-verifikasie.', zu: 'Ukungena kokuhlola kuphela: imininingwane ayiqinisekiswa futhi ayigcinwa. Uhlelo lwangempela ludinga ukuqinisekiswa okuvikelekile kuseva.', st: 'Ho kena ha teko feela: dintlha ha di netefatswe kapa ho bolokwa. Sistimi ya sebele e hloka netefatso e sireletsehileng ho seva.' },
+            'Sign in to Community Portal': { af: 'Meld aan by die gemeenskapsportaal', zu: 'Ngena Engosini Yomphakathi', st: 'Kena Portaleng ya Setjhaba' },
+            'Live Dashboard': { af: 'Regstreekse paneel', zu: 'Iphaneli ebukhoma', st: 'Dashboard ya jwale' },
+            'Tshwane Suburbs Grid': { af: 'Tshwane-voorstederooster', zu: 'Imephu yezindawo zaseTshwane', st: 'Mmapa wa dibaka tsa Tshwane' },
+            'Emergency Guidelines & Help': { af: 'Noodriglyne en hulp', zu: 'Iziqondiso zosizo oluphuthumayo', st: 'Tataiso le thuso ya tshohanyetso' },
+            'Exit': { af: 'Teken uit', zu: 'Phuma', st: 'Tsoa' },
+            'Community Portal': { af: 'Gemeenskapsportaal', zu: 'Ingosi Yomphakathi', st: 'Portal ya Setjhaba' },
+            'Transparent data for clean water & resilient neighborhoods': { af: 'Deursigtige data vir skoon water en veerkragtige woonbuurte', zu: 'Idatha esobala yamanzi ahlanzekile nemiphakathi eqinile', st: 'Dintlha tse pepeneneng bakeng sa metsi a hlwekileng le setjhaba se tiileng' },
+            'Safety Steps': { af: 'Veiligheidstappe', zu: 'Izinyathelo zokuphepha', st: 'Mehato ya polokeho' },
+            'Community average turbidity': { af: 'Gemiddelde troebelheid in die gemeenskap', zu: 'Isilinganiso sokungacaci kwamanzi emphakathini', st: 'Karolelano ya ho se hlake ha metsi setjhabeng' },
+            'NTU (estimated)': { af: 'NTU (geraam)', zu: 'NTU (okulinganisiwe)', st: 'NTU (tekanyetso)' },
+            'NTU (est.)': { af: 'NTU (geraam)', zu: 'NTU (okulinganisiwe)', st: 'NTU (tekanyetso)' },
+            'Water quality notice': { af: 'Watergehaltekennisgewing', zu: 'Isaziso sekhwalithi yamanzi', st: 'Tsebiso ya boleng ba metsi' },
+            'Optimal': { af: 'Optimaal', zu: 'Kusezingeni elihle', st: 'Boemong bo loketseng' },
+            'Optimal': { af: 'Optimaal', zu: 'Kusezingeni elihle', st: 'Boemong bo loketseng' },
+            'Elevated': { af: 'Verhoog', zu: 'Kuphezulu', st: 'Ho phahame' },
+            'Advisory active': { af: 'Waarskuwing aktief', zu: 'Kunesexwayiso esisebenzayo', st: 'Temoso e ntse e sebetsa' },
+            'Estimated from sensor readings; not a laboratory result.': { af: 'Geraam uit sensorlesings; nie ’n laboratoriumuitslag nie.', zu: 'Kulinganiselwa ngokufundwa kwezinzwa; akuwona umphumela waselabhorethri.', st: 'Ke tekanyetso e tswang dipalong tsa disensara; ha se sephetho sa laboratori.' },
+            'Active monitoring nodes': { af: 'Aktiewe moniteringspunte', zu: 'Izinodi zokuqapha ezisebenzayo', st: 'Dino di sebetsang tsa tlhokomelo' },
+            '8 reporting': { af: '8 rapporteer', zu: 'Eziyi-8 ziyabika', st: 'Tse 8 di a tlaleha' },
+            'Suburb coverage overview': { af: 'Oorsig van voorstedelike dekking', zu: 'Uhlolojikelele lokuqashwa kwezindawo', st: 'Kakaretso ya dibaka tse behilweng leihlo' },
+            'Grid mesh across 8 Tshwane zones': { af: 'Netwerk oor 8 Tshwane-sones', zu: 'Inethiwekhi ezindaweni eziyi-8 zaseTshwane', st: 'Marangrang dibakeng tse 8 tsa Tshwane' },
+            'Prototype notice: status, node counts and readings on this page are simulated and are not official water-safety certification. Follow City of Tshwane and health-authority notices.': { af: 'Prototipekennisgewing: status, puntetellings en lesings is nageboots en is nie amptelike sertifisering van waterveiligheid nie. Volg kennisgewings van die Stad Tshwane en gesondheidsowerhede.', zu: 'Isaziso sedemo: izimo, inani lamaphuzu nokufundwayo kuleli khasi kuyalingiswa futhi akusona isitifiketi esisemthethweni sokuphepha kwamanzi. Landela izaziso zoMkhandlu waseTshwane neziphathimandla zezempilo.', st: 'Tsebiso ya teko: maemo, dipalo tsa dino le dipalo tsa metsi di etsisitswe, ha se setifikeiti sa semmuso sa polokeho ya metsi. Latela ditsebiso tsa Motse wa Tshwane le balaodi ba bophelo bo botle.' },
+            'Safe-water boiling calculator': { af: 'Veilige-water-kooktydrekenaar', zu: 'Isibali sesikhathi sokubilisa amanzi aphephile', st: 'Sebali sa nako ya ho bedisa metsi a bolokehileng' },
+            'A simple rule-based timer, not AI or medical advice. Check your local health authority\'s instructions first.': { af: '’n Eenvoudige timer volgens vaste reëls, nie KI of mediese advies nie. Gaan eers jou plaaslike gesondheidsowerheid se instruksies na.', zu: 'Isibali-sikhathi esilandela imithetho elula, akusona i-AI noma iseluleko sezokwelapha. Qala ngokuhlola imiyalelo yeziphathimandla zezempilo zendawo.', st: 'Nako e latelang melao e bonolo, ha se AI kapa keletso ya bongaka. Qala ka ho sheba ditaelo tsa balaodi ba lehae ba bophelo bo botle.' },
+            'GUIDANCE DEMO': { af: 'RIGLYNE-DEMO', zu: 'IDEMO LEZIQALELO', st: 'TEKO YA TATAISO' },
+            'Water volume (litres)': { af: 'Watervolume (liter)', zu: 'Umthamo wamanzi (amalitha)', st: 'Bongata ba metsi (dilithara)' },
+            'Approximate altitude (metres)': { af: 'Benaderde hoogte bo seespieël (meter)', zu: 'Ukuphakama okulinganisiwe (amamitha)', st: 'Bophahamo bo hakanyetswang (dimithara)' },
+            'Start timer at rolling boil': { af: 'Begin timer wanneer water sterk kook', zu: 'Qalisa isibali-sikhathi lapho amanzi ebila ngamandla', st: 'Qala nako ha metsi a bela ka matla' },
+            'Stop timer': { af: 'Stop timer', zu: 'Misa isibali-sikhathi', st: 'Emisa nako' },
+            'Start only after the water reaches a rolling boil. Volume affects heating time, not the recommended time at a rolling boil.': { af: 'Begin eers wanneer die water sterk kook. Die volume beïnvloed hoe lank dit neem om te verhit, nie die aanbevole tyd wat dit sterk kook nie.', zu: 'Qalisa kuphela lapho amanzi ebila ngamandla. Umthamo uthinta isikhathi sokushisa, hhayi isikhathi esinconywayo sokubilisa.', st: 'Qala feela ha metsi a bela ka matla. Bongata bo ama nako ya ho futhumatsa, eseng nako e kgothaletswang ya ho bela.' },
+            'Do not boil water if officials warn of chemical contamination. Boiling does not remove chemicals. After boiling, cool and store covered in a clean, sanitized, food-safe container; use within 24 hours as a conservative demo guide unless local officials advise otherwise.': { af: 'Moenie water kook as amptenare teen chemiese besoedeling waarsku nie. Kook verwyder nie chemikalieë nie. Laat die water ná kook afkoel en bêre dit bedek in ’n skoon, ontsmette houer wat veilig is vir voedsel. Gebruik dit binne 24 uur as ’n versigtige demoriglyn, tensy plaaslike amptenare anders adviseer.', zu: 'Ungawabilisi amanzi uma iziphathimandla zixwayisa ngokungcoliswa ngamakhemikhali. Ukubilisa akuwasusi amakhemikhali. Uma esebilisiwe, wayeke aphole bese uwagcina emboziwe esitsheni esihlanzekile, esibulale amagciwane nesiphephile ekudleni; sebenzisa phakathi kwamahora angama-24 njengesiqondiso sedemo, ngaphandle uma iziphathimandla zendawo zisho okunye.', st: 'O se ke wa bedisa metsi haeba balaodi ba lemosa ka tshilafalo ya dikhemikhale. Ho bedisa ha ho tlose dikhemikhale. Ka mora ho bedisa, a tlohele a fole mme o a boloke a kwahetswe ka setshelong se hlwekileng, se bolailweng dikokwana-hloko se bolokehileng bakeng sa dijo; a sebedise nakong ya dihora tse 24 e le tataiso ya teko, ntle le haeba balaodi ba lehae ba eletsa ka tsela e nngwe.' },
+            'Infant formula guide': { af: 'Riglyn vir babamelk', zu: 'Umhlahlandlela wobisi lwezinsana', st: 'Tataiso ya lebese la masea' },
+            'Ready-to-feed sterile formula is preferred when available during an advisory. For powdered formula, ask a health professional or clinic for current safe preparation guidance. Never use water under a chemical contamination warning.': { af: 'Gebruik verkieslik steriele formule wat gereed is om te voer indien dit tydens ’n waarskuwing beskikbaar is. Vra ’n gesondheidswerker of kliniek vir huidige veilige voorbereidingsriglyne vir poeierformule. Moet nooit water gebruik waarvoor ’n chemiese besoedelingswaarskuwing geld nie.', zu: 'Uma kutholakala, khetha ubisi lwezinsana oluyinyumba nolulungele ukuphakelwa ngesikhathi sesexwayiso. Ngobisi oluyimpuphu, cela isisebenzi sezempilo noma umtholampilo sikuqondise ngendlela ephephile yokululungisa. Ungalokothi usebenzise amanzi axwayiswe ngokungcoliswa ngamakhemikhali.', st: 'Ha le fumaneha nakong ya temoso, kgetha lebese la lesea le hlwekileng le seng le loketse ho fepwa. Bakeng sa lebese la phofo, kopa setsebi sa bophelo bo botle kapa tleliniki hore e o fe tataiso ya hajwale ya ho le lokisa ka polokeho. O se ke wa sebedisa metsi a lemositsweng ka tshilafalo ya dikhemikhale.' },
+            'ClearScore resilience': { af: 'ClearScore-buurtveerkragtigheid', zu: 'Amaphuzu e-ClearScore okuqina komphakathi', st: 'ClearScore ya mamello ya setjhaba' },
+            'Neighborhood participation badge, not a water-quality or safety rating.': { af: '’n Kenteken vir buurtdeelname, nie ’n gradering van watergehalte of veiligheid nie.', zu: 'Ibheji lokubamba iqhaza komakhelwane, akusona isilinganiso sekhwalithi noma ukuphepha kwamanzi.', st: 'Letshwao la ho nka karolo ha baahisani, eseng tekanyo ya boleng kapa polokeho ya metsi.' },
+            'DEMO SCORE': { af: 'DEMO-TELLING', zu: 'AMAPHUZU EDEMO', st: 'DINTLHA TSA TEKO' },
+            'Neighborhood': { af: 'Buurt', zu: 'Indawo', st: 'Sebaka' },
+            '/ 100 demo points': { af: '/ 100 demo-punte', zu: '/ 100 amaphuzu edemo', st: '/ dintlha tse 100 tsa teko' },
+            'Water-wise neighbors': { af: 'Waterwyse bure', zu: 'Omakhelwane abonga amanzi', st: 'Baahisani ba baballang metsi' },
+            'Resilient neighbors': { af: 'Veerkragtige bure', zu: 'Omakhelwane abaqinayo', st: 'Baahisani ba nang le mamello' },
+            'Growing together': { af: 'Groei saam', zu: 'Sikhula ndawonye', st: 'Re hola mmoho' },
+            'Demo points reflect community report activity and self-reported conservation tips. Verified resolution data is not available in this prototype.': { af: 'Demopunte weerspieël gemeenskapsverslae en selfgerapporteerde waterbesparingswenke. Bevestigde data oor oplossing is nie in hierdie prototipe beskikbaar nie.', zu: 'Amaphuzu edemo abonisa imibiko yomphakathi namathiphu okonga amanzi abantu abazibikile. Le demo ayinayo idatha eqinisekisiwe yokuthi izinkinga zixazululiwe yini.', st: 'Dintlha tsa teko di bontsha ditlaleho tsa setjhaba le dikeletso tsa paballo ya metsi tse itlalehuwang. Dintlha tse netefaditsweng tsa tharollo ha di yo tekong ena.' },
+            'Try one tip: collect rinse water for plants, fix a dripping tap, or take a shorter shower.': { af: 'Probeer een wenk: vang spoelwater vir plante op, herstel ’n druppende kraan of stort korter.', zu: 'Zama icebo elilodwa: qoqa amanzi okugeza ukuze unisele izitshalo, lungisa umpompi ovuzayo, noma ugeze isikhathi esifushane.', st: 'Leka keletso e le nngwe: bokella metsi a ho hlatswa bakeng sa dimela, lokisa pompo e rothang, kapa hlapa shaoara e kgutshwane.' },
+            'I tried a conservation tip': { af: 'Ek het ’n waterbesparingswenk probeer', zu: 'Ngizamile icebo lokonga amanzi', st: 'Ke lekile keletso ya ho baballa metsi' },
+            'Illustrative score; tip activity is stored only for this page session.': { af: 'Illustratiewe telling; wenkaktiwiteit word slegs vir hierdie bladsessie gestoor.', zu: 'Amaphuzu ayisibonelo; umsebenzi wamathiphu ugcinwa kuphela ngalesi sikhathi sekhasi.', st: 'Dintlha ke tsa mohlala; tshebetso ya dikeletso e bolokwa feela nakong ena ya leqephe.' },
+            'Local Zone Highlights': { af: 'Hoogtepunte van plaaslike sones', zu: 'Izindawo ezibalulekile eziseduze', st: 'Dintlha tsa bohlokwa tsa sebaka' },
+            'View All': { af: 'Sien alles', zu: 'Buka konke', st: 'Sheba tsohle' },
+            'Quick summary of monitored Tshwane municipal areas:': { af: 'Kort opsomming van gemonitorde munisipale gebiede in Tshwane:', zu: 'Isifinyezo sezindawo zikamasipala zaseTshwane eziqashwayo:', st: 'Kakaretso ya dibaka tsa masepala tsa Tshwane tse behilweng leihlo:' },
+            'Continuous Polling': { af: 'Deurlopende peiling', zu: 'Ukuhlola okuqhubekayo', st: 'Tlhahlobo e tswelang pele' },
+            'Interval: 2.0s': { af: 'Tussenpose: 2.0 s', zu: 'Isikhawu: 2.0 s', st: 'Nako: 2.0 s' },
+            'Community incident reports': { af: 'Gemeenskapsinsidentverslae', zu: 'Imibiko yezigameko zomphakathi', st: 'Ditlaleho tsa diketsahalo tsa setjhaba' },
+            'Recent reports from residents. Reports are unverified until checked by municipal staff.': { af: 'Onlangse verslae van inwoners. Verslae is nie bevestig voordat munisipale personeel dit nagegaan het nie.', zu: 'Imibiko yakamuva yezakhamuzi. Imibiko ayikaqinisekiswa kuze kuhlolwe abasebenzi bakamasipala.', st: 'Ditlaleho tsa moraorao tsa baahi. Ha di eso netefatswe ho fihlela basebetsi ba masepala ba di hlahloba.' },
+            'Report an issue': { af: 'Rapporteer ’n probleem', zu: 'Bika inkinga', st: 'Tlaleha bothata' },
+            'No community reports have been submitted yet.': { af: 'Geen gemeenskapsverslae is nog ingedien nie.', zu: 'Akukathunyelwa mibiko yomphakathi.', st: 'Ha ho eso romelwe ditlaleho tsa setjhaba.' },
+            'Check by feature phone': { af: 'Kontroleer met ’n basiese selfoon', zu: 'Hlola usebenzisa ifoni engenayo i-inthanethi', st: 'Hlahloba ka mohala o sa hlokeng inthanete' },
+            'for water safety guidance. This on-page demo simulates the menu; live USSD requires a carrier service.': { af: 'vir riglyne oor waterveiligheid. Hierdie demo boots die kieslys na; regstreekse USSD vereis ’n selfoondiensverskaffer.', zu: 'ukuze uthole iziqondiso zokuphepha kwamanzi. Le demo ilingisa imenyu; i-USSD yangempela idinga isevisi yenethiwekhi yeselula.', st: 'bakeng sa tataiso ya polokeho ya metsi. Teko ena e etsisa lenane; USSD ya sebele e hloka tshebeletso ya mofani wa marangrang a mehala.' },
+            'Choose your suburb': { af: 'Kies jou voorstad', zu: 'Khetha indawo yakho', st: 'Kgetha sebaka sa heno' },
+            'Simulate USSD check': { af: 'Simuleer USSD-kontrole', zu: 'Lingisa ukuhlola kwe-USSD', st: 'Etsisa tlhahlobo ya USSD' },
+            'Select a suburb to simulate a safety query.': { af: 'Kies ’n voorstad om ’n veiligheidsnavraag te simuleer.', zu: 'Khetha indawo ukuze ulingise umbuzo wokuphepha.', st: 'Kgetha sebaka ho etsisa potso ya polokeho.' },
+            'Spotted an unannounced water outage or cloudiness?': { af: 'Het jy ’n onverwagte wateronderbreking of troebel water opgemerk?', zu: 'Ubonile ukuphazamiseka kwamanzi okungaziswanga noma amanzi angacacile?', st: 'Na o hlokometse kgaello ya metsi e sa tsebiswang kapa metsi a sa hlakang?' },
+            'Submit a community report to share a local issue with neighbors and municipal staff.': { af: 'Dien ’n gemeenskapsverslag in om ’n plaaslike probleem met bure en munisipale personeel te deel.', zu: 'Thumela umbiko womphakathi ukuze wabelane ngenkinga yendawo nomakhelwane nabasebenzi bakamasipala.', st: 'Romela tlaleho ya setjhaba ho tsebisa baahisani le basebetsi ba masepala ka bothata ba lehae.' },
+            'Submit Community Report': { af: 'Dien gemeenskapsverslag in', zu: 'Thumela umbiko womphakathi', st: 'Romela tlaleho ya setjhaba' },
+            'Tshwane Suburbs Water Quality Grid': { af: 'Tshwane-voorstede se watergehalte-rooster', zu: 'Imephu yekhwalithi yamanzi ezindaweni zaseTshwane', st: 'Mmapa wa boleng ba metsi dibakeng tsa Tshwane' },
+            'Live monitoring across primary municipal supply reservoirs and residential distribution lines.': { af: 'Regstreekse monitering van hoofmunisipale reservoirs en residensiële verspreidingslyne.', zu: 'Ukuqashwa bukhoma kwamadamu amakhulu kamasipala namapayipi okusabalalisa emakhaya.', st: 'Tlhokomelo ya jwale ya matamo a mantlha a masepala le diphaephe tsa kabo ya matlo.' },
+            'Search suburb...': { af: 'Soek voorstad...', zu: 'Sesha indawo...', st: 'Batla sebaka...' },
+            'Turbidity:': { af: 'Troebelheid:', zu: 'Ukungacaci kwamanzi:', st: 'Ho se hlake ha metsi:' },
+            'Normal / Safe': { af: 'Normaal / Veilig', zu: 'Kujwayelekile / Kuphephile', st: 'Tlwaelehileng / E bolokehile' },
+            'Community monitoring': { af: 'Gemeenskapsmonitering', zu: 'Ukuqashwa komphakathi', st: 'Tlhokomelo ya setjhaba' },
+            'SAFE': { af: 'VEILIG', zu: 'KUPHEPHILE', st: 'HO BOLOKEHILE' },
+            'BOIL ADVISORY': { af: 'KOOKWAARSKUWING', zu: 'ISEXWAYISO SOKUBILISA', st: 'TEMOSO YA HO BEDISA' },
+            'Emergency Boil-Water & Filtration Protocol': { af: 'Noodprosedure vir kookwater en filtrasie', zu: 'Indlela ephuthumayo yokubilisa nokuhlunga amanzi', st: 'Mokgwa wa tshohanyetso wa ho bedisa le ho sefa metsi' },
+            'Rolling boil': { af: 'Kook sterk vir 1 minuut', zu: 'Bilisa ngamandla umzuzu owodwa', st: 'Belisa ka matla motsotso o le mong' },
+            'During an advisory, bring water to a rolling boil for 1 minute (or follow the specific instruction from your health authority). Boiling does not remove chemical contamination.': { af: 'Tydens ’n waarskuwing, bring water tot ’n sterk kookpunt en kook dit vir 1 minuut (of volg jou gesondheidsowerheid se spesifieke instruksies). Kook verwyder nie chemiese besoedeling nie.', zu: 'Uma kunesexwayiso, bilisa amanzi ngamandla umzuzu owodwa (noma ulandele umyalelo oqondile weziphathimandla zezempilo). Ukubilisa akuwasusi amakhemikhali emanzini.', st: 'Nakong ya temoso, tlisa metsi hore a bele ka matla mme o a bedise motsotso o le mong (kapa o latele taelo e tobileng ya balaodi ba bophelo bo botle). Ho bedisa ha ho tlose tshilafalo ya dikhemikhale.' },
+            'Optical & Cloth Filtration': { af: 'Filtreer met ’n lap', zu: 'Hlunga ngendwangu', st: 'Sefa ka lesela' },
+            'If water is visibly cloudy, let it settle and strain through a clean cloth or coffee filter before disinfection. Filtration alone does not make unsafe water safe.': { af: 'As water sigbaar troebel is, laat dit afsak en syg dit deur ’n skoon lap of koffiefilter voordat jy dit ontsmet. Filtrasie alleen maak onveilige water nie veilig nie.', zu: 'Uma amanzi ebonakala engacacile, wayeke izinhlayiya zihlale phansi bese uwahlunga ngendwangu ehlanzekile noma ngesihlungi sekhofi ngaphambi kokuwabulala amagciwane. Ukuhlunga kukodwa akuwenzi amanzi angaphephile aphephe.', st: 'Ha metsi a bonahala a sa hlaka, a tlohele a eme ebe o a sefa ka lesela le hlwekileng kapa sefepi sa kofi pele o a bolaya dikokwana-hloko. Ho sefa feela ha ho etse hore metsi a sa bolokehang a bolokehe.' },
+            'Follow official disinfection advice': { af: 'Volg amptelike ontsmettingsadvies', zu: 'Landela iziqondiso ezisemthethweni zokubulala amagciwane', st: 'Latela keletso ya semmuso ya ho bolaya dikokwana-hloko' },
+            'Use only an approved water disinfectant and follow its label or local health-authority instructions. Do not guess bleach quantities; never mix bleach with other cleaners.': { af: 'Gebruik slegs ’n goedgekeurde waterontsmettingsmiddel en volg die etiket of plaaslike gesondheidsowerheid se instruksies. Moenie die hoeveelheid bleikmiddel raai nie; meng dit nooit met ander skoonmaakmiddels nie.', zu: 'Sebenzisa kuphela isibulali-magciwane samanzi esigunyaziwe, ulandele ilebula yaso noma imiyalelo yeziphathimandla zezempilo zendawo. Ungaqageli inani le-bleach; ungayixubi nezinye izihlanzi.', st: 'Sebedisa feela sebolaya-dikokwana-hloko sa metsi se dumelletsweng, mme o latele leibole ya sona kapa ditaelo tsa balaodi ba lehae ba bophelo bo botle. O se ke wa hakanya bongata ba bleach; o se ke wa e kopanya le dihloekisi tse ding.' },
+            'Infant formula during an advisory': { af: 'Babaformule tydens ’n waarskuwing', zu: 'Ubisi lwezinsana ngesikhathi sesexwayiso', st: 'Lebese la lesea nakong ya temoso' },
+            'Safe Storage': { af: 'Veilige berging', zu: 'Ukugcinwa okuphephile', st: 'Poloko e bolokehileng' },
+            'Store boiled water in clean, covered food-grade containers away from direct heat or light.': { af: 'Bêre gekookte water in skoon, bedekte houers wat vir voedsel geskik is, weg van direkte hitte of lig.', zu: 'Gcina amanzi abilisiwe ezitsheni ezihlanzekile, ezimboziwe neziphephile ekudleni, kude nokushisa noma ukukhanya okuqondile.', st: 'Boloka metsi a bedisitsweng ka hara ditshelo tse hlwekileng, tse kwahetsweng le tse bolokehileng bakeng sa dijo, hole le mocheso kapa kganya e tobileng.' },
+            'Emergency Tanker Distribution Points in Tshwane': { af: 'Noodwatertenkverspreidingspunte in Tshwane', zu: 'Izindawo zamathangi amanzi eziphuthumayo eTshwane', st: 'Dibaka tsa ditanka tsa metsi tsa tshohanyetso Tshwane' },
+            'Stationary Tanker Active': { af: 'Stilstaande watertenkwa aktief', zu: 'Iloli lamanzi limile futhi liyasebenza', st: 'Tanka e emeng e a sebetsa' },
+            'Operating until 20:00': { af: 'Bedryf tot 20:00', zu: 'Isebenza kuze kube u-20:00', st: 'E sebetsa ho fihlela 20:00' },
+            'Backup Supply Tank': { af: 'Rugsteunwatertenk', zu: 'Ithangi lamanzi eliyisipele', st: 'Tanka ya metsi ya bekapo' },
+            'Submit Community Incident Report': { af: 'Dien gemeenskapsinsidentverslag in', zu: 'Thumela umbiko wesigameko somphakathi', st: 'Romela tlaleho ya ketsahalo ya setjhaba' },
+            'Your Suburb / Location': { af: 'Jou voorstad / ligging', zu: 'Indawo okuyo', st: 'Sebaka sa heno' },
+            'Observed Issue': { af: 'Waargenome probleem', zu: 'Inkinga oyibonile', st: 'Bothata bo hlokometsoeng' },
+            'Discolored / Muddy Water': { af: 'Verkleurde / modderige water', zu: 'Amanzi ashintshe umbala / anodaka', st: 'Metsi a fetotseng mmala / a seretse' },
+            'Unusual Chemical Smell or Taste': { af: 'Ongewone chemiese reuk of smaak', zu: 'Iphunga noma ukunambitheka kwamakhemikhali okungajwayelekile', st: 'Monko kapa tatso e sa tlwaelehang ya dikhemikhale' },
+            'Low water pressure': { af: 'Lae waterdruk', zu: 'Umfutho wamanzi ophansi', st: 'Kgatelelo e tlase ya metsi' },
+            'Complete Water Outage / Zero Pressure': { af: 'Totale wateronderbreking / geen druk', zu: 'Amanzi anqamuke ngokuphelele / awukho umfutho', st: 'Metsi a kgaohile kaofela / ha ho kgatelelo' },
+            'Pipe Burst / Infrastructure Leak': { af: 'Gebarste pyp / infrastruktuurlek', zu: 'Ipayipi eliqhumile / ukuvuza kwengqalasizinda', st: 'Peipi e phatlohileng / metsi a dutlang meahong' },
+            'Details & Street Address': { af: 'Besonderhede en straatadres', zu: 'Imininingwane nekheli lomgwaqo', st: 'Dintlha le aterese ya seterata' },
+            'Describe water clarity, smell, or flow conditions...': { af: 'Beskryf die water se helderheid, reuk of vloei...', zu: 'Chaza ukucaca kwamanzi, iphunga noma indlela ageleza ngayo...', st: 'Hlalosa ho hlaka ha metsi, monko kapa tsela eo a phallang ka yona...' },
+            'Submit Report': { af: 'Dien verslag in', zu: 'Thumela umbiko', st: 'Romela tlaleho' },
+            'Essential Hotline Contacts': { af: 'Belangrike noodnommers', zu: 'Izinombolo ezibalulekile zosizo', st: 'Dinomoro tsa bohlokwa tsa thuso' },
+            'City of Tshwane Water Desk': { af: 'Stad Tshwane se waterkantoor', zu: 'Ihhovisi lamanzi loMkhandlu waseTshwane', st: 'Ofisi ya metsi ya Motse wa Tshwane' },
+            'Tshwane Disaster Management': { af: 'Tshwane-rampbestuur', zu: 'Abaphathi bezinhlekelele baseTshwane', st: 'Tsamaiso ya dikoduwa ya Tshwane' },
+            'Water Sanitation SMS Toll-Free': { af: 'Watersanitasie-SMS (tolvry)', zu: 'I-SMS yamahhala yokuhlanzwa kwamanzi', st: 'SMS ya mahala ya tsamaiso ya metsi a hlwekileng' },
+            'ClearCommunity Platform': { af: 'ClearCommunity-platform', zu: 'Ipulatifomu ye-ClearCommunity', st: 'Sethala sa ClearCommunity' },
+            '— FNB App of the Year Entry': { af: '— FNB App van die Jaar-inskrywing', zu: '— Umncintiswano we-FNB App of the Year', st: '— Kenyelletso ya FNB App of the Year' }
+            ,'Interval: 2.0s': { af: 'Tussenpose: 2.0 s', zu: 'Isikhawu: 2.0 s', st: 'Nako: 2.0 s' }
+            ,            'Timer running. Keep the water at a rolling boil; stay nearby and use safe handling.': { af: 'Die timer loop. Hou die water sterk kokend; bly naby en hanteer dit versigtig.', zu: 'Isibali-sikhathi siyasebenza. Gcina amanzi ebila ngamandla; hlala eduze futhi uwaphathe ngokuphepha.', st: 'Nako e ntse e sebetsa. Boloka metsi a bela ka matla; dula haufi mme o a tshware ka tlhokomelo.' },
+            'Timer complete. Turn off the heat carefully and let the water cool in a safe place.': { af: 'Tyd is verstreke. Skakel die hitte versigtig af en laat die water op ’n veilige plek afkoel.', zu: 'Isikhathi siphelile. Cima ukushisa ngokucophelela bese uyeka amanzi aphole endaweni ephephile.', st: 'Nako e fedile. Tima mocheso ka hloko mme o tlohele metsi a fole sebakeng se bolokehileng.' },
+            'Timer stopped. Start only after the water reaches a rolling boil.': { af: 'Timer gestop. Begin eers wanneer die water sterk kook.', zu: 'Isibali-sikhathi simisiwe. Qalisa kuphela lapho amanzi ebila ngamandla.', st: 'Nako e emisitswe. Qala feela ha metsi a bela ka matla.' },
+            'Enter a water volume from 0.1 to 20 litres and an altitude from 0 to 5,000 metres.': { af: 'Voer ’n watervolume van 0,1 tot 20 liter en ’n hoogte van 0 tot 5 000 meter in.', zu: 'Faka umthamo wamanzi osukela ku-0.1 kuya ku-20 wamalitha nokuphakama okusukela ku-0 kuye ku-5,000 wamamitha.', st: 'Kenya bongata ba metsi ba dilithara tse 0.1 ho isa ho 20 le bophahamo ba dimithara tse 0 ho isa ho 5,000.' },
+            'Report received · pending verification': { af: 'Verslag ontvang · wag op verifikasie', zu: 'Umbiko wamukelwe · ulinde ukuqinisekiswa', st: 'Tlaleho e amohetswe · e emetse netefatso' },
+            'No active boil-water advisory shown in this demo. Check official notices before drinking if water looks or smells unusual.': { af: 'Geen aktiewe kookwaterwaarskuwing word in hierdie demo gewys nie. Gaan amptelike kennisgewings na voordat jy water drink wat vreemd lyk of ruik.', zu: 'Le demo ayibonisi sexwayiso esisebenzayo sokubilisa amanzi. Hlola izaziso ezisemthethweni ngaphambi kokuphuza uma amanzi ebukeka noma enuka ngendlela engavamile.', st: 'Demo ena ha e bontshe temoso e sebetsang ya ho bedisa metsi. Sheba ditsebiso tsa semmuso pele o nwa metsi a shebahalang kapa a nkgang ka tsela e sa tlwaelehang.' },
+            'Unable to find that area. Please try again.': { af: 'Kon nie daardie gebied vind nie. Probeer asseblief weer.', zu: 'Ayikwazanga ukuthola leyo ndawo. Sicela uzame futhi.', st: 'Ha rea fumana sebaka seo. Ka kopo leka hape.' },
+            'Report received in this demo and added to the community feed. It has not been independently verified or sent to municipal services.': { af: 'Verslag in hierdie demo ontvang en by die gemeenskapsvoer gevoeg. Dit is nie onafhanklik bevestig of aan munisipale dienste gestuur nie.', zu: 'Umbiko wamukelwe kule demo futhi wengezwe ohlwini lwemibiko yomphakathi. Awukaqinisekiswa ngokuzimela futhi awuthunyelwanga ezinsizeni zikamasipala.', st: 'Tlaleho e amohetswe tekong ena mme ya eketswa lenaneng la setjhaba. Ha e eso netefatswe ka boikemelo kapa ho romelwa ditshebeletsong tsa masepala.' },
+            'Please add details about the issue before submitting.': { af: 'Voeg asseblief besonderhede oor die probleem by voordat jy indien.', zu: 'Sicela wengeze imininingwane yenkinga ngaphambi kokuthumela.', st: 'Ka kopo kenya dintlha tsa bothata pele o romela.' },
+            'Received · pending verification': { af: 'Ontvang · wag op verifikasie', zu: 'Kwamukelwe · kulinde ukuqinisekiswa', st: 'E amohetswe · e emetse netefatso' },
+            'all monitored areas': { af: 'alle gemonitorde gebiede', zu: 'zonke izindawo eziqashwayo', st: 'dibaka tsohle tse behilweng leihlo' },
+            'Community language': { af: 'Gemeenskapstaal', zu: 'Ulimi lomphakathi', st: 'Puo ya setjhaba' },
+            'Choose portal': { af: 'Kies portaal', zu: 'Khetha ingosi', st: 'Kgetha portal' },
+            'Community safety and resilience tools': { af: 'Gemeenskapsveiligheids- en veerkragtigheidsnutsmiddels', zu: 'Amathuluzi okuphepha nokuqina komphakathi', st: 'Disebediswa tsa polokeho le mamello ya setjhaba' },
+            'Community reporting and offline access': { af: 'Gemeenskapsverslagdoening en vanlyn toegang', zu: 'Ukubika komphakathi nokungena ngaphandle kwe-inthanethi', st: 'Ho tlaleha ha setjhaba le phihlello ntle le inthanete' },
+            'Select a suburb to simulate a safety query.': { af: 'Kies ’n voorstad om ’n veiligheidsnavraag na te boots.', zu: 'Khetha indawo ukuze ulingise umbuzo wokuphepha.', st: 'Kgetha sebaka ho etsisa potso ya polokeho.' },
+            'Use commercially prepared sterile liquid formula if available. If powdered formula must be used, follow current advice from your health professional or local health authority about safe water preparation; never use water covered by a chemical contamination warning. Contact a clinic for infant-specific guidance.': { af: 'Gebruik kommersieel voorbereide, steriele vloeibare formule indien beskikbaar. As poeierformule gebruik moet word, volg jou gesondheidswerker of plaaslike gesondheidsowerheid se huidige advies oor veilige watervoorbereiding; moet nooit water gebruik waarvoor ’n chemiese besoedelingswaarskuwing geld nie. Kontak ’n kliniek vir advies spesifiek vir jou baba.', zu: 'Sebenzisa ubisi oluwuketshezi oluyinyumba nolulungiselelwe ukuthengiswa uma lutholakala. Uma kufanele kusetshenziswe ubisi oluyimpuphu, landela iseluleko samanje sesisebenzi sezempilo noma seziphathimandla zezempilo zendawo ngokulungisa amanzi ngokuphepha; ungawasebenzisi amanzi axwayiswe ngokungcoliswa ngamakhemikhali. Xhumana nomtholampilo ukuze uthole isiqondiso esiqondene nosana.', st: 'Sebedisa lebese la lesea le metsi le hlwekileng le lokiseditsweng ho rekiswa haeba le fumaneha. Ha ho hlokahala ho sebedisa lebese la phofo, latela keletso ya hajwale ya setsebi sa bophelo bo botle kapa balaodi ba lehae mabapi le ho lokisa metsi ka polokeho; o se ke wa sebedisa metsi a lemositsweng ka tshilafalo ya dikhemikhale. Ikopanye le tleliniki bakeng sa tataiso e tobileng ya lesea.' },
+            'Tip recorded for this neighborhood. The score is illustrative and is not independently verified.': { af: 'Wenk vir hierdie buurt aangeteken. Die telling is illustratief en nie onafhanklik bevestig nie.', zu: 'Ithiphu iqoshwe yale ndawo. Amaphuzu ayisibonelo futhi awaqinisekiswanga ngokuzimela.', st: 'Keletso e ngotswe bakeng sa sebaka sena. Dintlha ke tsa mohlala mme ha di a netefatswa ka boikemelo.' },
+            'ClearCommunity - Pretoria Water Quality & Early-Warning Platform': { af: 'ClearCommunity - Watergehalte en vroeëwaarskuwingsplatform vir Pretoria', zu: 'ClearCommunity - Inkundla yekhwalithi yamanzi nezexwayiso zangaphambi kwesikhathi ePitoli', st: 'ClearCommunity - Sethala sa boleng ba metsi le ditemoso tsa pele Pretoria' },
+            'ClearCommunity — Decentralized Water Vigilance & Alerts | Pretoria': { af: 'ClearCommunity — Gedesentraliseerde watermonitering en waarskuwings | Pretoria', zu: 'ClearCommunity — Ukuqapha amanzi nokuxwayisa okusabalele | ePitoli', st: 'ClearCommunity — Tlhokomelo ya metsi le ditemoso tse hasaneng | Pretoria' }
+        };
+        const translatedTextNodes = new WeakMap();
+        const translatedAttributes = new WeakMap();
+
+        function translateNodeText(node, language) {
+            if (!translatedTextNodes.has(node)) {
+                translatedTextNodes.set(node, node.nodeValue);
+            }
+            const original = translatedTextNodes.get(node);
+            const content = original.trim();
+            const translation = communityCopyTranslations[content]?.[language];
+            if (!translation) {
+                node.nodeValue = original;
+                return;
+            }
+            const leadingWhitespace = original.match(/^\s*/)[0];
+            const trailingWhitespace = original.match(/\s*$/)[0];
+            node.nodeValue = `${leadingWhitespace}${translation}${trailingWhitespace}`;
+        }
+
+        function translateCommunityContent() {
+            const roots = [document.getElementById('login-view')];
+            if (currentRole === 'community') {
+                roots.push(document.getElementById('app-shell'));
+            }
+            const language = currentRole === 'municipal' ? 'en' : communityLanguage;
+
+            roots.filter(Boolean).forEach(root => {
+                const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+                    acceptNode(node) {
+                        return node.parentElement?.closest(
+                            '[data-role="municipal"], #statusText, #emergencyBannerTitle, #emergencyBannerDescription, #emergencyBanner [data-role="community"]'
+                        )
+                            ? NodeFilter.FILTER_REJECT
+                            : NodeFilter.FILTER_ACCEPT;
+                    }
+                });
+                while (walker.nextNode()) {
+                    translateNodeText(walker.currentNode, language);
+                }
+
+                root.querySelectorAll('input, textarea, select, button, img[alt], [aria-label], [title]').forEach(element => {
+                    const attributes = ['placeholder', 'aria-label', 'title', 'alt'];
+                    attributes.forEach(attribute => {
+                        if (!element.hasAttribute(attribute)) return;
+                        let originals = translatedAttributes.get(element);
+                        if (!originals) {
+                            originals = {};
+                            translatedAttributes.set(element, originals);
+                        }
+                        if (!(attribute in originals)) {
+                            originals[attribute] = element.getAttribute(attribute);
+                        }
+                        const original = originals[attribute];
+                        const translation = communityCopyTranslations[original]?.[language];
+                        element.setAttribute(attribute, translation || original);
+                    });
+                });
+            });
+        }
+
+        // INITIALIZE APPLICATION
+        window.onload = function() {
+            initRTCClock();
+            initChart();
+            renderSuburbsGrid();
+            renderQuickSuburbsList();
+            renderIncidentReports();
+            startTelemetryLoop();
+            updateBoilDurationGuidance();
+            renderClearScore();
+        };
+
+        // TAB SWITCHING
+        function switchTab(tabId) {
+            const sharedTab = tabId === 'dashboard' || tabId === 'suburbs';
+            const communityTab = tabId === 'guidelines' && currentRole === 'community';
+            const municipalTab = tabId === 'telemetry' && currentRole === 'municipal';
+            if (!sharedTab && !communityTab && !municipalTab) {
+                return;
+            }
+
+            document.querySelectorAll('.tab-view').forEach(view => view.classList.add('hidden'));
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('bg-teal-500/20', 'text-teal-300', 'border', 'border-teal-500/30');
+                tab.classList.add('text-slate-400');
+            });
+
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const activeNav = document.getElementById(`tab-${tabId}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-teal-500/20', 'text-teal-300', 'border', 'border-teal-500/30');
+                activeNav.classList.remove('text-slate-400');
+            }
+        }
+
+        function switchLoginTab(role) {
+            const isCommunity = role === 'community';
+            document.getElementById('login-community').classList.toggle('hidden', !isCommunity);
+            document.getElementById('login-municipal').classList.toggle('hidden', isCommunity);
+            document.getElementById('login-tab-community').setAttribute('aria-selected', String(isCommunity));
+            document.getElementById('login-tab-municipal').setAttribute('aria-selected', String(!isCommunity));
+            document.getElementById('login-tab-community').className = isCommunity
+                ? 'flex-1 border-b-2 border-teal-500 pb-3 text-sm font-semibold text-teal-300 transition'
+                : 'flex-1 border-b-2 border-transparent pb-3 text-sm font-semibold text-slate-400 transition hover:text-white';
+            document.getElementById('login-tab-municipal').className = isCommunity
+                ? 'flex-1 border-b-2 border-transparent pb-3 text-sm font-semibold text-slate-400 transition hover:text-white'
+                : 'flex-1 border-b-2 border-emerald-500 pb-3 text-sm font-semibold text-emerald-300 transition';
+            document.getElementById('login-error').classList.add('hidden');
+        }
+
+        function enterPortal(role, municipalId = '') {
+            currentRole = role;
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('app-shell').classList.remove('hidden');
+            document.getElementById('app-shell').classList.add('flex');
+            document.querySelectorAll('[data-role="municipal"]').forEach(control => {
+                control.classList.toggle('hidden', role !== 'municipal');
+            });
+            document.querySelectorAll('[data-role="community"]').forEach(control => {
+                control.classList.toggle('hidden', role !== 'community');
+            });
+
+            const roleBadge = document.getElementById('portalRoleBadge');
+            roleBadge.textContent = role === 'municipal' ? `Municipal Console · ${municipalId}` : 'Community Portal';
+            roleBadge.classList.remove('hidden');
+            renderSuburbsGrid();
+            renderQuickSuburbsList();
+            renderIncidentReports();
+            renderMunicipalOperations();
+            applyCommunityTranslations();
+            switchTab('dashboard');
+        }
+
+        function loginAsCommunity(event) {
+            event.preventDefault();
+            const form = document.getElementById('login-community');
+            const error = document.getElementById('community-login-error');
+
+            if (!form.reportValidity()) {
+                return;
+            }
+
+            error.classList.add('hidden');
+            enterPortal('community');
+        }
+
+        function loginAsMunicipality(event) {
+            event.preventDefault();
+            const input = document.getElementById('municipal-id-input');
+            const municipalId = input.value.trim().toUpperCase();
+            const error = document.getElementById('login-error');
+
+            if (!/^MUN-[A-Z]{3}-\d{4}$/.test(municipalId)) {
+                error.classList.remove('hidden');
+                input.focus();
+                return;
+            }
+
+            error.classList.add('hidden');
+            enterPortal('municipal', municipalId);
+        }
+
+        function logout() {
+            currentRole = null;
+            document.getElementById('app-shell').classList.add('hidden');
+            document.getElementById('app-shell').classList.remove('flex');
+            document.getElementById('login-view').classList.remove('hidden');
+            document.getElementById('municipal-id-input').value = '';
+            document.getElementById('login-community').reset();
+            document.getElementById('community-login-error').classList.add('hidden');
+            document.getElementById('login-error').classList.add('hidden');
+            stopBoilTimer();
+            document.getElementById('loginCommunityLanguage').value = communityLanguage;
+            translateCommunityContent();
+            switchLoginTab('community');
+        }
+
+        function communityText(key) {
+            const language = currentRole === 'municipal' ? 'en' : communityLanguage;
+            return communityTranslations[language][key] || communityCopyTranslations[key]?.[language] || key;
+        }
+
+        function communityTemplate(key, substitutions = {}) {
+            const language = currentRole === 'municipal' ? 'en' : communityLanguage;
+            const template = communityCopyTranslations[key]?.[language]
+                || communityTranslations[language][key]
+                || key;
+            return Object.entries(substitutions).reduce((result, [token, value]) => result.replaceAll(`{${token}}`, String(value)), template);
+        }
+
+        function setCommunityLanguage(language) {
+            if (!Object.prototype.hasOwnProperty.call(communityTranslations, language)) {
+                return;
+            }
+            communityLanguage = language;
+            document.documentElement.lang = language;
+            document.getElementById('communityLanguage').value = language;
+            document.getElementById('loginCommunityLanguage').value = language;
+            document.title = communityCopyTranslations['ClearCommunity - Pretoria Water Quality & Early-Warning Platform']?.[language]
+                || 'ClearCommunity - Pretoria Water Quality & Early-Warning Platform';
+            applyCommunityTranslations();
+            renderSuburbsGrid();
+            renderQuickSuburbsList();
+            renderIncidentReports();
+            renderClearScore();
+            const result = document.getElementById('ussdResult');
+            if (result.dataset.suburbId) {
+                simulateUssdQuery();
+            }
+        }
+
+        function applyCommunityTranslations() {
+            const active = activeAdvisories.size > 0;
+            document.getElementById('statusText').innerText = communityText(active ? 'advisory' : 'safe');
+            document.getElementById('emergencyBannerTitle').innerText = active
+                ? `${communityText('bannerTitle')}: ${getAdvisoryAreaNames()}`
+                : communityText('bannerTitle');
+            document.getElementById('emergencyBannerDescription').innerText = communityText('bannerDescription');
+            document.querySelector('#emergencyBanner [data-role="community"]').innerText = communityText('safetySteps');
+            translateCommunityContent();
+        }
+
+        function getAdvisoryAreaNames() {
+            if (activeAdvisories.has('citywide')) return 'all monitored areas';
+            return suburbsData
+                .filter(suburb => activeAdvisories.has(suburb.id))
+                .map(suburb => suburb.name)
+                .join(', ');
+        }
+
+        function updateBoilDurationGuidance() {
+            const altitudeInput = document.getElementById('boilAltitude');
+            const volumeInput = document.getElementById('boilVolume');
+            const guidance = document.getElementById('boilDurationGuidance');
+            const volume = Number(volumeInput.value);
+            const altitude = Number(altitudeInput.value);
+
+            if (!volumeInput.validity.valid || !altitudeInput.validity.valid) {
+                guidance.innerText = communityText('Enter a water volume from 0.1 to 20 litres and an altitude from 0 to 5,000 metres.');
+                return;
+            }
+
+            boilTimerDurationSeconds = altitude >= 2000 ? 180 : 60;
+            const duration = boilTimerDurationSeconds === 180 ? '3 minutes' : '1 minute';
+            const durationGuidance = {
+                en: `For ${volume.toFixed(1)} L at about ${altitude} m altitude: bring it to a rolling boil, then keep boiling for ${duration}. Volume affects how long heating takes, not the rolling-boil duration.`,
+                af: `Vir ${volume.toFixed(1)} L op ongeveer ${altitude} m hoogte: bring dit tot ’n sterk kookpunt en kook dit dan vir ${duration}. Die volume beïnvloed die verhittingstyd, nie die aanbevole kooktyd nie.`,
+                zu: `Ku-${volume.toFixed(1)} L endaweni ephakeme cishe ngamamitha angu-${altitude}: yibilise ngamandla bese uqhubeka uyibilisa ${boilTimerDurationSeconds / 60} ${boilTimerDurationSeconds === 60 ? 'umzuzu' : 'imizuzu'}. Umthamo uthinta isikhathi sokushisa, hhayi isikhathi sokubilisa esinconywayo.`,
+                st: `Bakeng sa ${volume.toFixed(1)} L bophahamong ba dimithara tse ka bang ${altitude}: tlisa metsi hore a bele ka matla, ebe o tswela pele ho a bedisa metsotso e ${boilTimerDurationSeconds / 60}. Bongata bo ama nako ya ho futhumatsa, eseng nako e kgothaletswang ya ho bela.`
+            };
+            guidance.innerText = durationGuidance[communityLanguage];
+            translateCommunityContent();
+            if (!boilTimerInterval) {
+                renderBoilTimer(boilTimerDurationSeconds);
+            }
+        }
+
+        function renderBoilTimer(seconds) {
+            const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
+            const remainingSeconds = String(seconds % 60).padStart(2, '0');
+            document.getElementById('boilTimerDisplay').innerText = `${minutes}:${remainingSeconds}`;
+        }
+
+        function startBoilTimer() {
+            const volumeInput = document.getElementById('boilVolume');
+            const altitudeInput = document.getElementById('boilAltitude');
+            const status = document.getElementById('boilTimerStatus');
+            if (!volumeInput.reportValidity() || !altitudeInput.reportValidity()) {
+                return;
+            }
+            if (boilTimerInterval) {
+                clearInterval(boilTimerInterval);
+            }
+            updateBoilDurationGuidance();
+            boilTimerEndsAt = Date.now() + boilTimerDurationSeconds * 1000;
+            status.innerText = communityText('Timer running. Keep the water at a rolling boil; stay nearby and use safe handling.');
+            document.getElementById('startBoilTimerButton').disabled = true;
+            document.getElementById('startBoilTimerButton').classList.add('opacity-50', 'cursor-not-allowed');
+            volumeInput.disabled = true;
+            altitudeInput.disabled = true;
+
+            const tick = () => {
+                const remaining = Math.max(0, Math.ceil((boilTimerEndsAt - Date.now()) / 1000));
+                renderBoilTimer(remaining);
+                if (remaining === 0) {
+                    clearInterval(boilTimerInterval);
+                    boilTimerInterval = null;
+                    boilTimerEndsAt = null;
+                    status.innerText = communityText('Timer complete. Turn off the heat carefully and let the water cool in a safe place.');
+                    document.getElementById('startBoilTimerButton').disabled = false;
+                    document.getElementById('startBoilTimerButton').classList.remove('opacity-50', 'cursor-not-allowed');
+                    volumeInput.disabled = false;
+                    altitudeInput.disabled = false;
+                }
+            };
+            tick();
+            boilTimerInterval = setInterval(tick, 1000);
+        }
+
+        function stopBoilTimer() {
+            if (boilTimerInterval) {
+                clearInterval(boilTimerInterval);
+                boilTimerInterval = null;
+            }
+            boilTimerEndsAt = null;
+            const button = document.getElementById('startBoilTimerButton');
+            const status = document.getElementById('boilTimerStatus');
+            document.getElementById('boilVolume').disabled = false;
+            document.getElementById('boilAltitude').disabled = false;
+            if (button && status) {
+                button.disabled = false;
+                button.classList.remove('opacity-50', 'cursor-not-allowed');
+                status.innerText = communityText('Timer stopped. Start only after the water reaches a rolling boil.');
+                renderBoilTimer(boilTimerDurationSeconds);
+            }
+        }
+
+        function renderClearScore() {
+            const suburbId = document.getElementById('clearScoreSuburb').value;
+            const baseScore = neighborhoodBaseScores[suburbId] || 80;
+            const tipCount = conservationTipsCompleted.get(suburbId) || 0;
+            const reportCount = neighborhoodReportsSubmitted.get(suburbId) || 0;
+            const score = Math.min(100, baseScore + tipCount + Math.min(3, reportCount));
+            document.getElementById('clearScoreValue').innerText = score;
+            document.getElementById('clearScoreBadge').innerText = score >= 95
+                ? communityText('Water-wise neighbors')
+                : score >= 88
+                    ? communityText('Resilient neighbors')
+                    : communityText('Growing together');
+            translateCommunityContent();
+        }
+
+        function recordConservationTip() {
+            const suburbId = document.getElementById('clearScoreSuburb').value;
+            const current = conservationTipsCompleted.get(suburbId) || 0;
+            conservationTipsCompleted.set(suburbId, Math.min(6, current + 1));
+            renderClearScore();
+            const suburb = suburbsData.find(item => item.id === suburbId);
+            document.getElementById('clearScoreStatus').innerText = `${suburb.name} demo participation updated. This score is illustrative, not independently verified, and lasts only for this page session.`;
+        }
+
+        // REAL-TIME CLOCK (DS1307 RTC SYNCED)
+        function initRTCClock() {
+            function updateClock() {
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                
+                const timeStr = `${hours}:${minutes}:${seconds} SAST`;
+                const dateStr = now.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+
+                document.getElementById('rtcTimeDisplay').innerText = timeStr;
+                document.getElementById('rtcDateDisplay').innerText = dateStr;
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        // INITIALIZE CHART.JS FOR TELEMETRY
+        function initChart() {
+            const ctx = document.getElementById('telemetryChart').getContext('2d');
+            
+            // Create gradient for turbidity line
+            const tealGradient = ctx.createLinearGradient(0, 0, 0, 300);
+            tealGradient.addColorStop(0, 'rgba(0, 212, 178, 0.4)');
+            tealGradient.addColorStop(1, 'rgba(0, 212, 178, 0.0)');
+
+            const initialLabels = Array.from({length: 12}, (_, i) => `${i*2}s ago`).reverse();
+            const initialTurbData = Array(12).fill(245);
+            const initialTempData = Array(12).fill(19.4);
+
+            telemetryChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: initialLabels,
+                    datasets: [
+                        {
+                            label: 'Turbidity (LDR ADC)',
+                            data: initialTurbData,
+                            borderColor: '#00D4B2',
+                            backgroundColor: tealGradient,
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 2.5,
+                            yAxisID: 'yTurb'
+                        },
+                        {
+                            label: 'Temperature (°C)',
+                            data: initialTempData,
+                            borderColor: '#60A5FA',
+                            borderDash: [4, 4],
+                            fill: false,
+                            tension: 0.2,
+                            borderWidth: 1.5,
+                            yAxisID: 'yTemp'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 300 },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono', size: 10 } }
+                        },
+                        yTurb: {
+                            type: 'linear',
+                            position: 'left',
+                            min: 0,
+                            max: 1000,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#00D4B2', font: { family: 'JetBrains Mono', size: 10 } }
+                        },
+                        yTemp: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 45,
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#60A5FA', font: { family: 'JetBrains Mono', size: 10 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // SIMULATION TELEMETRY LOOP
+        function startTelemetryLoop() {
+            setInterval(() => {
+                if (currentRole !== 'municipal') {
+                    return;
+                }
+
+                // Add slight noise to simulate sensor variations
+                let noiseTurb = Math.floor((Math.random() - 0.5) * 8);
+                let currentTurb = Math.max(50, Math.min(950, simulatedTurbidity + noiseTurb));
+                
+                let noiseTemp = parseFloat(((Math.random() - 0.5) * 0.2).toFixed(1));
+                let currentTemp = parseFloat((simulatedTemp + noiseTemp).toFixed(1));
+
+                // Update UI Cards
+                updateMetricCards(currentTurb, currentTemp);
+                if (currentTurb > 500) {
+                    logHighTurbidityTicket();
+                }
+
+                if (currentRole === 'municipal') {
+                    if (telemetryChart) {
+                        telemetryChart.data.datasets[0].data.shift();
+                        telemetryChart.data.datasets[0].data.push(currentTurb);
+
+                        telemetryChart.data.datasets[1].data.shift();
+                        telemetryChart.data.datasets[1].data.push(currentTemp);
+
+                        telemetryChart.update('none');
+                    }
+                    logRS485Packet(currentTurb, currentTemp);
+                }
+
+            }, 2000);
+        }
+
+        // UPDATE METRIC CARDS
+        function updateMetricCards(turb, temp) {
+            const averageAdc = suburbsData.reduce((total, suburb) => total + suburb.turbidity, 0) / suburbsData.length;
+            const averageNtu = averageAdc * (2.1 / 245);
+            document.getElementById('metricTurbidityValue').innerText = averageNtu.toFixed(1);
+            document.getElementById('metricTempValue').innerText = temp;
+
+            const turbBar = document.getElementById('metricTurbidityBar');
+            const turbTag = document.getElementById('metricTurbidityTag');
+
+            const tempBar = document.getElementById('metricTempBar');
+            const tempTag = document.getElementById('metricTempTag');
+
+            // Turbidity Evaluation
+            const turbPercent = Math.min(100, (averageAdc / 1000) * 100);
+            turbBar.style.width = `${turbPercent}%`;
+
+            if (activeAdvisories.size > 0) {
+                turbBar.className = "bg-alertRed h-1.5 rounded-full transition-all duration-500";
+                turbTag.className = "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-alertRed/20 text-alertRed";
+                turbTag.innerText = "Advisory active";
+            } else if (averageAdc > 350) {
+                turbBar.className = "bg-warningAmber h-1.5 rounded-full transition-all duration-500";
+                turbTag.className = "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-warningAmber/20 text-warningAmber";
+                turbTag.innerText = "Elevated";
+            } else {
+                turbBar.className = "bg-teal-500 h-1.5 rounded-full transition-all duration-500";
+                turbTag.className = "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-teal-500/10 text-teal-400";
+                turbTag.innerText = "Optimal";
+            }
+
+            // Temperature Evaluation
+            const tempPercent = Math.min(100, (temp / 45) * 100);
+            tempBar.style.width = `${tempPercent}%`;
+
+            if (temp > 28.0) {
+                tempBar.className = "bg-warningAmber h-1.5 rounded-full transition-all duration-500";
+                tempTag.className = "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-warningAmber/20 text-warningAmber";
+                tempTag.innerText = "Bacterial Risk";
+            } else {
+                tempBar.className = "bg-blue-400 h-1.5 rounded-full transition-all duration-500";
+                tempTag.className = "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500/10 text-blue-400";
+                tempTag.innerText = "Normal";
+            }
+
+            if (currentRole === 'community') {
+                translateCommunityContent();
+            }
+        }
+
+        // LOG C-STYLE TELEMETRY PACKET TO CONSOLE
+        function logRS485Packet(turb, temp) {
+            const terminal = document.getElementById('serialTerminal');
+            if (!terminal) return;
+
+            const now = new Date();
+            const timestamp = now.toISOString().replace('T', ' ').substring(0, 19);
+            const statusStr = turb > 500 ? "WARN_CONTAMINATION" : "STATUS_OK";
+            const colorClass = turb > 500 ? "text-alertRed font-bold" : "text-teal-400";
+
+            const logEntry = document.createElement('div');
+            logEntry.className = colorClass;
+            logEntry.innerText = `[RS485] CLEARNODE_01 -> TURB:${turb} ADC | TEMP:${temp}°C | RTC:${timestamp} | ${statusStr}`;
+
+            terminal.appendChild(logEntry);
+            serialLogCount++;
+
+            // Auto scroll terminal
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function clearSerialConsole() {
+            const terminal = document.getElementById('serialTerminal');
+            terminal.innerHTML = `<div class="text-slate-500">// Serial log cleared by operator. Listening for RS485 packets...</div>`;
+        }
+
+        // SLIDER CONTROLS FOR MANUAL TESTING
+        function updateSimulatedValues() {
+            simulatedTurbidity = parseInt(document.getElementById('inputTurbidity').value);
+            simulatedTemp = parseFloat(document.getElementById('inputTemp').value);
+
+            document.getElementById('sliderTurbidityVal').innerText = `${simulatedTurbidity} ADC`;
+            document.getElementById('sliderTempVal').innerText = `${simulatedTemp} °C`;
+
+            // If user pushes slider into high turbidity, trigger alert mode automatically
+            if (simulatedTurbidity > 500 && !isIncidentActive) {
+                setIncidentState(true);
+            } else if (simulatedTurbidity <= 500 && isIncidentActive) {
+                setIncidentState(false);
+            }
+        }
+
+        function setHardwarePreset(turb, temp) {
+            document.getElementById('inputTurbidity').value = turb;
+            document.getElementById('inputTemp').value = temp;
+            updateSimulatedValues();
+        }
+
+        // INCIDENT SIMULATION TOGGLE
+        function toggleSimulatedIncident() {
+            if (currentRole !== 'municipal') {
+                return;
+            }
+            setIncidentState(!isIncidentActive);
+        }
+
+        function setIncidentState(active) {
+            isIncidentActive = active;
+            const btnText = document.getElementById('incidentBtnText');
+
+            if (isIncidentActive) {
+                isBannerDismissed = false;
+                activeAdvisories.add('cbd');
+                activeAdvisories.add('arcadia');
+                btnText.innerText = "Reset System to Safe";
+                suburbsData[0].turbidity = 680;
+                suburbsData[1].turbidity = 480;
+                if (simulatedTurbidity <= 500) {
+                    setHardwarePreset(680, 24.5);
+                }
+
+            } else {
+                activeAdvisories.delete('cbd');
+                activeAdvisories.delete('arcadia');
+                btnText.innerText = "Trigger Contamination Incident";
+                suburbsData[0].turbidity = 240;
+                suburbsData[1].turbidity = 220;
+                setHardwarePreset(245, 19.4);
+            }
+
+            updateAdvisoryStatus();
+            renderSuburbsGrid();
+            renderQuickSuburbsList();
+            renderMunicipalOperations();
+        }
+
+        function updateAdvisoryStatus() {
+            const active = activeAdvisories.size > 0;
+            const badge = document.getElementById('mainStatusBadge');
+            const ping = document.getElementById('statusPing');
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            const banner = document.getElementById('emergencyBanner');
+            const bannerTitle = document.getElementById('emergencyBannerTitle');
+            const bannerDescription = banner.querySelector('p');
+
+            badge.className = active
+                ? "flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-alertRed/20 border border-alertRed/40 text-alertRed font-bold text-sm pulse-red"
+                : "flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 font-semibold text-sm";
+            ping.className = active
+                ? "animate-ping absolute inline-flex h-full w-full rounded-full bg-alertRed opacity-75"
+                : "animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75";
+            dot.className = active
+                ? "relative inline-flex rounded-full h-2.5 w-2.5 bg-alertRed"
+                : "relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500";
+            text.innerText = communityText(active ? 'advisory' : 'safe');
+            banner.classList.toggle('hidden', !active || isBannerDismissed);
+
+            if (active) {
+                bannerTitle.innerText = `${communityText('bannerTitle')}: ${getAdvisoryAreaNames()}`;
+                bannerDescription.innerText = communityText('bannerDescription');
+            }
+            applyCommunityTranslations();
+        }
+
+        function applyManualAdvisory(active) {
+            if (currentRole !== 'municipal') return;
+            const scope = document.getElementById('advisoryScope').value;
+            const feedback = document.getElementById('overrideFeedback');
+
+            if (scope === 'citywide') {
+                if (active) {
+                    isBannerDismissed = false;
+                    activeAdvisories.add('citywide');
+                } else {
+                    activeAdvisories.clear();
+                    isIncidentActive = false;
+                    suburbsData[0].turbidity = 240;
+                    suburbsData[1].turbidity = 220;
+                    document.getElementById('incidentBtnText').innerText = 'Trigger Contamination Incident';
+                    setHardwarePreset(245, 19.4);
+                }
+            } else if (active) {
+                isBannerDismissed = false;
+                activeAdvisories.add(scope);
+            } else {
+                activeAdvisories.delete(scope);
+            }
+
+            updateAdvisoryStatus();
+            renderSuburbsGrid();
+            renderQuickSuburbsList();
+            updateMetricCards(simulatedTurbidity, simulatedTemp);
+            renderMunicipalOperations();
+            const suburb = suburbsData.find(item => item.id === scope);
+            feedback.innerText = active
+                ? `Demo override issued for ${suburb ? suburb.name : 'all monitored areas'}.`
+                : `Demo advisory cleared for ${suburb ? suburb.name : 'all monitored areas'}.`;
+        }
+
+        function isSuburbUnderAdvisory(suburb) {
+            return activeAdvisories.has('citywide') || activeAdvisories.has(suburb.id);
+        }
+
+        function dismissBanner() {
+            isBannerDismissed = true;
+            document.getElementById('emergencyBanner').classList.add('hidden');
+        }
+
+        // RENDER TSHWANE SUBURBS GRID
+        function renderSuburbsGrid() {
+            const grid = document.getElementById('suburbsGrid');
+            if (!grid) return;
+
+            grid.innerHTML = suburbsData.map(suburb => {
+                let statusBadge = '';
+                let borderClass = 'border-slate-700/80';
+
+                const underAdvisory = isSuburbUnderAdvisory(suburb);
+                if (underAdvisory) {
+                    statusBadge = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-alertRed/20 text-alertRed border border-alertRed/40">${communityText('advisoryArea')}</span>`;
+                    borderClass = 'border-alertRed/60 bg-alertRed/5';
+                } else {
+                    statusBadge = `<span class="px-2 py-0.5 rounded text-xs font-semibold bg-teal-500/10 text-teal-400">${communityText('safeArea')}</span>`;
+                }
+
+                const turbidityDisplay = currentRole === 'municipal'
+                    ? `${suburb.turbidity} ADC`
+                    : `${(suburb.turbidity * (2.1 / 245)).toFixed(1)} NTU (est.)`;
+                const turbidityColor = underAdvisory ? 'text-alertRed font-bold' : 'text-teal-400';
+                const technicalDetails = currentRole === 'municipal'
+                    ? `<div class="flex justify-between"><span class="text-slate-400">Temp (LM35):</span><span>${suburb.temp} °C</span></div>
+                       <div class="flex justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-700/60"><span>${suburb.node}</span><span>${suburb.lastSync}</span></div>`
+                    : '';
+
+                return `
+                    <div class="bg-navy-800 border ${borderClass} rounded-2xl p-4 space-y-3 transition hover:border-slate-500">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-bold text-white text-sm">${suburb.name}</h3>
+                            ${statusBadge}
+                        </div>
+                        <div class="text-xs space-y-1 font-mono text-slate-300">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Turbidity:</span>
+                                <span class="${turbidityColor}">${turbidityDisplay}</span>
+                            </div>
+                            ${technicalDetails}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            if (currentRole === 'community') {
+                translateCommunityContent();
+            }
+        }
+
+        // RENDER QUICK SUBURBS SIDEBAR LIST
+        function renderQuickSuburbsList() {
+            const list = document.getElementById('quickSuburbList');
+            if (!list) return;
+
+            list.innerHTML = suburbsData.slice(0, 4).map(suburb => {
+                const underAdvisory = isSuburbUnderAdvisory(suburb);
+                const badgeColor = underAdvisory ? 'text-alertRed' : 'text-teal-400';
+                const publicReading = `${(suburb.turbidity * (2.1 / 245)).toFixed(1)} NTU`;
+                return `
+                    <div class="p-2.5 bg-navy-900/60 rounded-xl border border-slate-700/60 flex items-center justify-between text-xs">
+                        <div>
+                            <div class="font-semibold text-slate-200">${suburb.name}</div>
+                            <div class="text-[11px] text-slate-400">${currentRole === 'municipal' ? suburb.node : 'Community monitoring'}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold font-mono ${badgeColor}">${currentRole === 'municipal' ? `${suburb.turbidity} ADC` : publicReading}</div>
+                            <div class="text-[10px] text-slate-400">${communityText(underAdvisory ? 'advisoryShort' : 'safeShort')}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            if (currentRole === 'community') {
+                translateCommunityContent();
+            }
+        }
+
+        function renderMunicipalOperations() {
+            if (currentRole !== 'municipal') return;
+            renderPredictiveHeatmap();
+            renderValveControls();
+            renderMaintenanceTickets();
+        }
+
+        function renderPredictiveHeatmap() {
+            const heatmap = document.getElementById('predictionHeatmap');
+            const predictions = document.getElementById('flowPredictions');
+            if (!heatmap || !predictions) return;
+
+            const affectedSources = suburbsData.filter(suburb =>
+            suburb.turbidity > 350 || isSuburbUnderAdvisory(suburb)
+            );
+            const predictedArrival = new Map();
+            const activeRoutes = [];
+
+            affectedSources.forEach(source => {
+            if (isolatedValveNodes.has(source.id)) return;
+            downstreamRoutes
+                .filter(route => route.from === source.id)
+                .forEach(route => {
+                    const destination = suburbsData.find(suburb => suburb.id === route.to);
+                    if (!destination || isolatedValveNodes.has(destination.id)) return;
+                    const etaMinutes = Math.round((route.distanceKm * 1000 / route.velocityMps) / 60);
+                    predictedArrival.set(route.to, Math.min(predictedArrival.get(route.to) || Infinity, etaMinutes));
+                    activeRoutes.push({ source, destination, route, etaMinutes });
+                });
+            });
+
+            heatmap.replaceChildren();
+            suburbsData.forEach(suburb => {
+            const sourceAlert = affectedSources.some(source => source.id === suburb.id);
+            const eta = predictedArrival.get(suburb.id);
+            const tile = document.createElement('div');
+            tile.className = sourceAlert
+                ? 'rounded-lg border border-alertRed/50 bg-alertRed/10 p-3'
+                : eta !== undefined
+                    ? 'rounded-lg border border-warningAmber/50 bg-warningAmber/10 p-3'
+                    : 'rounded-lg border border-slate-700 bg-navy-900/70 p-3';
+            const area = document.createElement('div');
+            area.className = 'text-xs font-semibold text-white';
+            area.innerText = suburb.name;
+            const status = document.createElement('div');
+            status.className = 'mt-1 text-[10px] font-semibold';
+            status.innerText = sourceAlert
+                ? 'UPSTREAM ALERT'
+                : eta !== undefined
+                    ? `PREDICTED · ${eta} MIN`
+                    : 'NO SPIKE DETECTED';
+            tile.append(area, status);
+            heatmap.appendChild(tile);
+            });
+
+            predictions.replaceChildren();
+            if (activeRoutes.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'rounded-lg border border-slate-700 bg-navy-900/50 p-3 text-xs text-slate-400';
+            empty.innerText = 'No simulated upstream turbidity spike is currently driving a downstream prediction.';
+            predictions.appendChild(empty);
+            return;
+            }
+
+            activeRoutes.forEach(({ source, destination, route, etaMinutes }) => {
+            const row = document.createElement('div');
+            row.className = 'flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-700 bg-navy-900/50 p-3 text-xs';
+            const path = document.createElement('span');
+            path.className = 'text-slate-200';
+            path.innerText = `${source.name} → ${destination.name} · ${route.distanceKm.toFixed(1)} km`;
+            const timing = document.createElement('span');
+            timing.className = 'font-mono font-semibold text-warningAmber';
+            timing.innerText = `${etaMinutes} min at assumed ${route.velocityMps.toFixed(1)} m/s`;
+            row.append(path, timing);
+            predictions.appendChild(row);
+            });
+        }
+
+        function renderValveControls() {
+            const controls = document.getElementById('valveControls');
+            if (!controls) return;
+            controls.replaceChildren();
+
+            suburbsData.forEach(suburb => {
+            const isolated = isolatedValveNodes.has(suburb.id);
+            const row = document.createElement('div');
+            row.className = 'flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-700 bg-navy-900/50 p-3';
+            const label = document.createElement('div');
+            const nodeName = document.createElement('div');
+            nodeName.className = 'text-xs font-semibold text-white';
+            nodeName.innerText = `${suburb.node} · ${suburb.name}`;
+            const state = document.createElement('div');
+            state.className = isolated ? 'mt-1 text-[10px] font-bold text-alertRed' : 'mt-1 text-[10px] font-bold text-teal-300';
+            state.innerText = isolated ? 'ISOLATED (SIMULATED)' : 'OPEN (SIMULATED)';
+            label.append(nodeName, state);
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = isolated
+                ? 'rounded-lg border border-teal-500/40 px-3 py-1.5 text-xs font-semibold text-teal-300 hover:bg-teal-500/10'
+                : 'rounded-lg border border-alertRed/40 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-alertRed/10';
+            button.innerText = isolated ? 'Reopen demo valve' : 'Isolate suburb line';
+            button.setAttribute('aria-label', `${isolated ? 'Reopen' : 'Isolate'} ${suburb.name} demo valve`);
+            button.addEventListener('click', () => toggleDemoValve(suburb));
+            row.append(label, button);
+            controls.appendChild(row);
+            });
+        }
+
+        function toggleDemoValve(suburb) {
+            if (currentRole !== 'municipal') return;
+            const status = document.getElementById('valveActionStatus');
+            if (isolatedValveNodes.has(suburb.id)) {
+            isolatedValveNodes.delete(suburb.id);
+            status.innerText = `Demo action only: ${suburb.name} valve marked OPEN. No physical valve was controlled.`;
+            } else {
+            isolatedValveNodes.add(suburb.id);
+            status.innerText = `Demo action only: ${suburb.name} line marked ISOLATED. No physical valve was controlled.`;
+            }
+            renderValveControls();
+            renderPredictiveHeatmap();
+        }
+
+        function renderMaintenanceTickets() {
+            const rows = document.getElementById('maintenanceTicketRows');
+            if (!rows) return;
+            rows.replaceChildren();
+
+            maintenanceTickets.forEach(ticket => {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-slate-700/60 align-top';
+            const ticketCell = document.createElement('td');
+            ticketCell.className = 'px-3 py-3 font-mono text-slate-200';
+            ticketCell.innerText = `${ticket.id} · ${ticket.node}`;
+            const issueCell = document.createElement('td');
+            issueCell.className = 'px-3 py-3 text-slate-300';
+            issueCell.innerText = ticket.issue;
+
+            const technicianCell = document.createElement('td');
+            technicianCell.className = 'px-3 py-3';
+            if (ticket.technician) {
+                technicianCell.innerText = ticket.technician;
+                technicianCell.classList.add('text-teal-300');
+            } else {
+                const technicianSelect = document.createElement('select');
+                technicianSelect.id = `technician-${ticket.id}`;
+                technicianSelect.className = 'rounded border border-slate-700 bg-navy-900 px-2 py-1 text-slate-200';
+                technicianSelect.setAttribute('aria-label', `Assign technician for ${ticket.id}`);
+                technicianSelect.innerHTML = '<option value="">Choose technician</option><option value="N. Mokoena">N. Mokoena</option><option value="T. Dlamini">T. Dlamini</option><option value="L. Nkosi">L. Nkosi</option>';
+                technicianCell.appendChild(technicianSelect);
+            }
+
+            const statusCell = document.createElement('td');
+            statusCell.className = 'px-3 py-3';
+            const statusSelect = document.createElement('select');
+            statusSelect.className = 'rounded border border-slate-700 bg-navy-900 px-2 py-1 text-slate-200';
+            statusSelect.setAttribute('aria-label', `Update status for ${ticket.id}`);
+            ['Open', 'Assigned', 'In progress', 'Resolved'].forEach(status => {
+                const option = document.createElement('option');
+                option.value = status;
+                option.innerText = status;
+                option.selected = ticket.status === status;
+                statusSelect.appendChild(option);
+            });
+            statusSelect.addEventListener('change', () => {
+                ticket.status = statusSelect.value;
+            });
+            statusCell.appendChild(statusSelect);
+
+            const dispatchCell = document.createElement('td');
+            dispatchCell.className = 'px-3 py-3';
+            if (!ticket.technician) {
+                const assignButton = document.createElement('button');
+                assignButton.type = 'button';
+                assignButton.className = 'rounded-lg bg-teal-500 px-3 py-1.5 font-semibold text-navy-900 hover:bg-teal-400';
+                assignButton.innerText = 'Assign ticket';
+                assignButton.addEventListener('click', () => assignMaintenanceTicket(ticket));
+                dispatchCell.appendChild(assignButton);
+            } else {
+                dispatchCell.innerText = 'Dispatched (demo)';
+                dispatchCell.classList.add('text-teal-300');
+            }
+
+            row.append(ticketCell, issueCell, technicianCell, statusCell, dispatchCell);
+            rows.appendChild(row);
+            });
+        }
+
+        function assignMaintenanceTicket(ticket) {
+            if (currentRole !== 'municipal') return;
+            const technicianSelect = document.getElementById(`technician-${ticket.id}`);
+            if (!technicianSelect || !technicianSelect.value) {
+            technicianSelect?.focus();
+            return;
+            }
+            ticket.technician = technicianSelect.value;
+            if (ticket.status === 'Open') ticket.status = 'Assigned';
+            renderMaintenanceTickets();
+        }
+
+        function logHighTurbidityTicket() {
+            const node = suburbsData[0];
+            const hasOpenTicket = maintenanceTickets.some(ticket =>
+            ticket.node === node.node && ticket.issue.startsWith('High turbidity alert') && ticket.status !== 'Resolved'
+            );
+            if (hasOpenTicket) return;
+
+            maintenanceTickets.push({
+            id: `MT-${String(nextMaintenanceTicketId++).padStart(3, '0')}`,
+            node: node.node,
+            issue: `High turbidity alert detected (${simulatedTurbidity} ADC, demo)`,
+            technician: '',
+            status: 'Open'
+            });
+            renderMaintenanceTickets();
+        }
+
+        // SUBURB FILTERING
+        function filterSuburbs() {
+            const query = document.getElementById('suburbSearch').value.toLowerCase();
+            const cards = document.getElementById('suburbsGrid').children;
+
+            Array.from(cards).forEach((card, idx) => {
+                const suburbName = suburbsData[idx].name.toLowerCase();
+                if (suburbName.includes(query)) {
+                    card.style.display = "block";
+                } else {
+                    card.style.display = "none";
+                }
+            });
+        }
+
+        function simulateUssdQuery() {
+            const suburbId = document.getElementById('ussdSuburb').value;
+            const suburb = suburbsData.find(item => item.id === suburbId);
+            if (!suburb) {
+                document.getElementById('ussdResult').innerText = 'Unable to find that area. Please try again.';
+                return;
+            }
+
+            const result = document.getElementById('ussdResult');
+            result.dataset.suburbId = suburbId;
+            result.innerText = `${suburb.name}: ${communityText(isSuburbUnderAdvisory(suburb) ? 'ussdAdvisory' : 'ussdSafe')}`;
+        }
+
+        function renderIncidentReports() {
+            const containers = [
+                document.getElementById('communityReportFeed'),
+                document.getElementById('adminIncidentReports')
+            ].filter(Boolean);
+
+            containers.forEach(container => {
+                container.replaceChildren();
+                if (communityReports.length === 0) {
+                    const emptyState = document.createElement('p');
+                    emptyState.className = 'text-xs text-slate-400';
+                    emptyState.innerText = communityText('No community reports have been submitted yet.');
+                    container.appendChild(emptyState);
+                    return;
+                }
+
+                communityReports.slice().reverse().forEach(report => {
+                    const item = document.createElement('article');
+                    item.className = 'rounded-xl border border-slate-700/70 bg-navy-900/60 p-3';
+                    const heading = document.createElement('h3');
+                    heading.className = 'text-sm font-semibold text-white';
+                    heading.innerText = `${report.issueLabel || report.issue} · ${report.suburb}`;
+                    const details = document.createElement('p');
+                    details.className = 'mt-1 whitespace-pre-wrap text-xs text-slate-300';
+                    details.innerText = report.details;
+                    const meta = document.createElement('p');
+                    meta.className = 'mt-2 text-[11px] text-slate-400';
+                    meta.innerText = `${report.timestamp} · ${communityText(report.status)}`;
+                    item.append(heading, details, meta);
+                    container.appendChild(item);
+                });
+            });
+            if (currentRole === 'community') {
+                translateCommunityContent();
+            }
+        }
+
+        function bytesToHex(bytes) {
+            return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function generateComplianceReport() {
+            const status = document.getElementById('complianceReportStatus');
+            const reportWindow = window.open('', '_blank');
+            if (!reportWindow) {
+                status.innerText = 'The report window was blocked. Allow pop-ups for this page, then try again.';
+                return;
+            }
+
+            status.innerText = 'Generating report and SHA-256 digest...';
+            try {
+                if (!window.crypto || !window.crypto.subtle) {
+                    throw new Error('Web Crypto is unavailable in this browser context.');
+                }
+
+                const payload = {
+                    reportTitle: 'SANS 241 Water Quality Compliance Report (Demo)',
+                    generatedAt: new Date().toISOString(),
+                    auditor: document.getElementById('portalRoleBadge').innerText,
+                    dataSource: 'Simulated ClearCommunity browser data; not a certified compliance record.',
+                    activeAdvisories: activeAdvisories.has('citywide')
+                        ? ['All monitored areas']
+                        : suburbsData.filter(suburb => activeAdvisories.has(suburb.id)).map(suburb => suburb.name),
+                    nodes: suburbsData.map(suburb => ({
+                        node: suburb.node,
+                        suburb: suburb.name,
+                        turbidityAdc: suburb.turbidity,
+                        estimatedTurbidityNtu: Number((suburb.turbidity * (2.1 / 245)).toFixed(2)),
+                        temperatureC: suburb.temp,
+                        status: isSuburbUnderAdvisory(suburb) ? 'BOIL-WATER ADVISORY' : 'No advisory shown'
+                    })),
+                    communityReportCount: communityReports.length
+                };
+                const canonicalPayload = JSON.stringify(payload);
+                const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalPayload));
+                const hash = bytesToHex(digest);
+                const rows = payload.nodes.map(node => `<tr><td>${node.node}</td><td>${node.suburb}</td><td>${node.turbidityAdc} ADC</td><td>${node.estimatedTurbidityNtu} NTU*</td><td>${node.temperatureC} °C</td><td>${node.status}</td></tr>`).join('');
+                const advisories = payload.activeAdvisories.length ? payload.activeAdvisories.join(', ') : 'None';
+
+                reportWindow.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${payload.reportTitle}</title><style>
+                    body{font:14px Arial,sans-serif;color:#172033;margin:32px;line-height:1.5}h1{font-size:22px}h2{font-size:16px;margin-top:24px}p{margin:6px 0}.warning{border:1px solid #b45309;background:#fffbeb;padding:12px}.actions{margin:18px 0}button{padding:9px 14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #94a3b8;padding:6px;text-align:left}th{background:#e2e8f0}.hash{word-break:break-all;font-family:monospace}@media print{body{margin:12mm}.actions{display:none}tr{break-inside:avoid}}
+                    </style></head><body><h1>${payload.reportTitle}</h1><div class="warning"><strong>Prototype report — not an official SANS 241 certificate or verified municipal record.</strong> Sensor values and system-health figures are simulated. NTU values are estimates from the demo calibration.</div><p><strong>Generated:</strong> ${payload.generatedAt}</p><p><strong>Auditor metadata:</strong> ${payload.auditor}</p><p><strong>Data source:</strong> ${payload.dataSource}</p><p><strong>Active advisories:</strong> ${advisories}</p><p><strong>Community reports received:</strong> ${payload.communityReportCount}</p><h2>Node readings</h2><table><thead><tr><th>Node</th><th>Area</th><th>Turbidity</th><th>Estimated turbidity</th><th>Temperature</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><p>*NTU estimate based on the prototype's illustrative ADC calibration, not laboratory measurement.</p><h2>Integrity digest</h2><p>SHA-256 of the JSON payload shown in this report:</p><p class="hash">${hash}</p><div class="actions"><button onclick="window.print()">Print / Save as PDF</button></div><p>Report format and content require validation by municipal compliance and water-quality specialists before production use.</p></body></html>`);
+                reportWindow.document.close();
+                status.innerText = `Printable report generated. SHA-256: ${hash}`;
+            } catch (error) {
+                reportWindow.close();
+                status.innerText = `Unable to generate compliance report: ${error.message}`;
+            }
+        }
+
+        // FORM SUBMISSION HANDLER
+        function handleReportSubmit(e) {
+            e.preventDefault();
+            const suburb = document.getElementById('reportSuburb').value;
+            const issue = document.getElementById('reportIssue').value;
+            const details = document.getElementById('reportDetails').value.trim();
+            if (!details) {
+                document.getElementById('reportSubmitStatus').innerText = 'Please add details about the issue before submitting.';
+                return;
+            }
+
+            communityReports.push({
+                suburb,
+                issue,
+                details,
+                timestamp: new Date().toLocaleString('en-ZA'),
+                status: 'Received · pending verification'
+            });
+            const reportedSuburb = suburbsData.find(item => item.name === suburb);
+            if (reportedSuburb) {
+                const reportCount = neighborhoodReportsSubmitted.get(reportedSuburb.id) || 0;
+                neighborhoodReportsSubmitted.set(reportedSuburb.id, reportCount + 1);
+            }
+            renderIncidentReports();
+            renderClearScore();
+            document.getElementById('reportSubmitStatus').innerText = 'Report received in this demo and added to the community feed. It has not been independently verified or sent to municipal services.';
+            e.target.reset();
+        }
+    </script>
+</body>
+</html>
